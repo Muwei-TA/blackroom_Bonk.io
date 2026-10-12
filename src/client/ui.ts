@@ -1,3 +1,4 @@
+import { GAME_MODES, mapForMode, type GameMode } from "../shared/game-mode";
 import { RADIUS, ENERGY, PHYSICS } from "../shared/constants";
 import { MAPS } from "../shared/maps";
 import { openWorkshop } from "./editor/workshop";
@@ -25,12 +26,13 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
  <div class="entry-note"><span>◎</span><p>同一个房间，同一份快乐。<br><small>推荐使用电脑与键盘游玩</small></p></div></aside>
  </section>
  <section id="room" class="room-layout" hidden>
- <div class="arena-column"><div class="arena-heading"><div><div class="eyebrow">PRIVATE ARENA</div><h2 data-testid="map-name" id="map-name">起点站</h2></div><div class="round-pill"><span id="round-label">自由准备</span><b id="timer">—</b></div></div>
- <div class="arena"><div class="arena-top"><span class="status-dot"></span><span id="phase" data-testid="phase">等待朋友加入</span><span class="first-to">先赢 5 回合获胜</span></div><canvas id="arena-canvas" aria-label="实时物理对战场地"></canvas><div id="overlay" class="arena-overlay"><b id="overlay-title"></b><p id="overlay-subtitle"></p></div><div class="arena-bottom"><span id="self-status" data-testid="self-status">等待开场</span><span>抢能量，变大变重。</span></div></div>
+ <div class="arena-column"><div class="arena-heading"><div><div class="eyebrow" id="mode-label" data-testid="mode-label">经典弹球</div><h2 data-testid="map-name" id="map-name">起点站</h2></div><div class="round-pill"><span id="round-label">自由准备</span><b id="timer">—</b></div></div>
+ <div class="arena"><div class="arena-top"><span class="status-dot"></span><span id="phase" data-testid="phase">等待朋友加入</span><span class="first-to">先赢 5 回合获胜</span></div><canvas id="arena-canvas" aria-label="实时物理对战场地"></canvas><div id="overlay" class="arena-overlay"><b id="overlay-title"></b><p id="overlay-subtitle"></p></div><div class="arena-bottom"><span id="self-status" data-testid="self-status">等待开场</span><span id="arena-rule-hint">稳住，别掉下去。</span></div></div>
  <div class="arena-tip"><span>↳</span><p id="notice">邀请朋友，开始一场友好的较量。</p></div>
  </div>
  <aside class="room-sidebar"><div class="room-code-box"><span class="small-label">你的专属房间</span><div class="code-line"><strong id="room-code" data-testid="room-code"></strong><button id="copy" class="icon-button" aria-label="复制房间码">⧉</button></div><p class="muted">把房间码发给朋友，一起入场</p></div>
  <div class="roster-heading"><h3>场上好友</h3><span id="player-count">1 / 8</span></div><ul id="players" data-testid="players"></ul>
+ <label for="game-mode">对战模式</label><select id="game-mode" data-testid="game-mode" class="game-mode-select"><option value="classic">经典弹球（默认）</option><option value="energy">能量天平</option></select><p id="mode-description" class="field-hint"></p>
  <p id="growth-status" data-testid="growth-status" class="field-hint">能量雨 · 每轮成长重置</p>
  <div class="map-heading"><h3>选择竞技场</h3><span>房主设置</span></div><div id="map-options" class="map-options"></div>
  <button id="random-map" class="button secondary custom-map-button">随机地图</button>
@@ -56,6 +58,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     window.dispatchEvent(new Event("blur"));
     workshop = openWorkshop(root, {
       initial: room?.map ?? MAPS[0],
+      mode: room?.mode ?? "classic",
       canApply: () =>
         connected && room?.hostId === selfId && room?.phase === "lobby",
       apply: (document) => send({ type: "applyCustomMap", document }),
@@ -68,6 +71,11 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   el("open-workshop").onclick = launchWorkshop;
   el("custom-map").onclick = launchWorkshop;
   el("random-map").onclick = () => send({ type: "randomMap" });
+  el<HTMLSelectElement>("game-mode").onchange = () =>
+    send({
+      type: "selectMode",
+      mode: el<HTMLSelectElement>("game-mode").value as GameMode,
+    });
   const error = (message: string) => {
     el("error").textContent = message;
     el("error").hidden = false;
@@ -132,6 +140,12 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     el("map-name").textContent = room.map.name;
     el("player-count").textContent = `${room.players.length} / 8`;
     el("notice").textContent = room.notice;
+    el<HTMLSelectElement>("game-mode").value = room.mode;
+    el("mode-label").textContent = GAME_MODES[room.mode].name;
+    el("mode-description").textContent = GAME_MODES[room.mode].description;
+    el("growth-status").hidden = room.mode !== "energy";
+    el("arena-rule-hint").textContent =
+      room.mode === "energy" ? "抢能量，变大变重。" : "稳住，别掉下去。";
     el("round-label").textContent =
       room.phase === "lobby"
         ? "自由准备"
@@ -170,6 +184,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     }
     const host = room.hostId === selfId,
       lobby = room.phase === "lobby";
+    el<HTMLSelectElement>("game-mode").disabled = !connected || !host || !lobby;
     el<HTMLButtonElement>("random-map").disabled =
       !connected || room.hostId !== selfId || room.phase !== "lobby";
     el<HTMLButtonElement>("custom-map").disabled =
@@ -201,7 +216,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   }
   function frame() {
     if (room) {
-      const map = room.map;
+      const map = mapForMode(room.map, room.mode);
       const sampled = buffer.sampleWorld(
         (world?.serverTime ?? 0) + (performance.now() - receivedAt) - 100,
       );
@@ -286,7 +301,11 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
         error(m.message);
         workshop?.failed(m.message);
       } else if (m.type === "room") {
-        if (room?.code !== m.room.code || room?.map.id !== m.room.map.id) {
+        if (
+          room?.code !== m.room.code ||
+          room?.map.id !== m.room.map.id ||
+          room?.mode !== m.room.mode
+        ) {
           buffer.clear();
           world = null;
         }
@@ -317,6 +336,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
           b.id !== "open-workshop"
         )
           b.disabled = true;
+      el<HTMLSelectElement>("game-mode").disabled = true;
       workshop?.failed("连接已断开，你仍可保存或导出本地作品。");
     },
     dispose() {

@@ -3,8 +3,10 @@ import Matter from "matter-js";
 import { Match } from "../../src/server/match";
 import { getMap } from "../../src/shared/maps";
 import { neutralInput } from "../../src/shared/protocol";
-const make = () => {
-  const m = new Match(getMap("origin"), ["a", "b"]);
+const make = (
+  mode: import("../../src/shared/game-mode").GameMode = "classic",
+) => {
+  const m = new Match(getMap("origin"), ["a", "b"], mode);
   m.tick(0);
   m.start();
   return m;
@@ -78,7 +80,7 @@ it("old sequences ignored and stale input cleared", () => {
   m.dispose();
 });
 it("new rounds clear collected growth and old drops in authoritative snapshots", () => {
-  const m = make();
+  const m = make("energy");
   m.tick(3000);
   for (let i = 1; i <= 65; i++) m.tick(3000 + i * 17);
   const w = m.physics!,

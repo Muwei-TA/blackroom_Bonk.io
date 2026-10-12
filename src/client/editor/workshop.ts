@@ -1,3 +1,4 @@
+import type { GameMode } from "../../shared/game-mode";
 import { generateRandomMap } from "../../shared/random-map";
 import { normalizeAngle } from "../../shared/geometry";
 import { SEESAW_MAX_ANGLE } from "../../shared/constants";
@@ -21,6 +22,7 @@ import { workshopView } from "./view";
 import "./workshop.css";
 type Options = {
   initial: MapDefinition;
+  mode?: GameMode;
   canApply: () => boolean;
   apply: (document: MapDocument) => void;
   close: () => void;
@@ -57,6 +59,9 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
   let removeCanvas: () => void = () => {},
     applyTimeout: ReturnType<typeof setTimeout> | undefined;
   const canvas = el<HTMLCanvasElement>("editor-canvas");
+  const modeField = el<HTMLSelectElement>("editor-trial-mode");
+  modeField.value = options.mode ?? "classic";
+  const trialMode = () => modeField.value as GameMode;
   const notify = (text: string) => (el("workshop-message").textContent = text);
   const guarded = async (fn: () => void | Promise<void>) => {
     try {
@@ -275,7 +280,11 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
   function startTrial() {
     guarded(() => {
       trial?.dispose();
-      trial = new PhysicsWorld(toDefinition(checked(), "trial"), ["trial"]);
+      trial = new PhysicsWorld(
+        toDefinition(checked(), "trial"),
+        ["trial"],
+        trialMode(),
+      );
       input = neutralInput();
       accumulator = 0;
       last = performance.now();
@@ -323,7 +332,10 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       request(() =>
         load(
           toDocument(
-            generateRandomMap(crypto.getRandomValues(new Uint32Array(1))[0]),
+            generateRandomMap(
+              crypto.getRandomValues(new Uint32Array(1))[0],
+              trialMode(),
+            ),
           ),
         ),
       ),
@@ -646,7 +658,9 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       const ball = trial.snapshot()[0];
       const alive = ball?.alive;
       el("trial-status").textContent = alive
-        ? `试跑中 · 能量 ${ball.energy}/10 · 直径 ${ball.radius * 2} · A/D 移动，W 跳跃，空格加重`
+        ? trialMode() === "energy"
+          ? `试跑中 · 能量天平 · 能量 ${ball.energy}/10 · 直径 ${ball.radius * 2} · A/D 移动，W 跳跃，空格加重`
+          : "试跑中 · 经典弹球 · 固定体型与地面 · A/D 移动，W 跳跃，空格加重"
         : "已掉出场地 · 点击重置再试一次";
     }
     last = now;
@@ -656,6 +670,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       trial?.snapshot(),
       trial?.platformSnapshot(),
       trial?.energySnapshot(),
+      trialMode(),
     );
     raf = requestAnimationFrame(frame);
   }

@@ -19,7 +19,7 @@ const collect = (w: PhysicsWorld, id = "a") => {
   w.step();
 };
 it("falling energy grows actual radius and mass, while heavy toggles preserve growth", () => {
-  const w = new PhysicsWorld(MAPS[0], ["a"], () => 0.25);
+  const w = new PhysicsWorld(MAPS[0], ["a"], "energy", () => 0.25);
   const originalMass = ball(w).mass;
   tick(w, 65);
   const start = w.energySnapshot()[0].y;
@@ -38,12 +38,12 @@ it("falling energy grows actual radius and mass, while heavy toggles preserve gr
   w.step();
   expect(ball(w).mass).toBeCloseTo(grownMass);
   w.dispose();
-  const fresh = new PhysicsWorld(MAPS[0], ["a"]);
+  const fresh = new PhysicsWorld(MAPS[0], ["a"], "energy");
   expect(fresh.snapshot()[0]).toMatchObject({ energy: 0, radius: 20 });
   fresh.dispose();
 });
 it("one drop rewards one alive player and growth is capped", () => {
-  const w = new PhysicsWorld(MAPS[0], ["a", "b"], () => 0.25);
+  const w = new PhysicsWorld(MAPS[0], ["a", "b"], "energy", () => 0.25);
   collect(w, "a");
   expect(w.snapshot().map((b) => b.energy)).toEqual([1, 0]);
   w.removePlayer("b");
@@ -53,7 +53,7 @@ it("one drop rewards one alive player and growth is capped", () => {
   w.dispose();
 });
 it("energy expires, falls onto platforms, stays bounded and is not collected by eliminated balls", () => {
-  const w = new PhysicsWorld(MAPS[0], ["a"], () => 0.5);
+  const w = new PhysicsWorld(MAPS[0], ["a"], "energy", () => 0.5);
   Matter.Body.setPosition(ball(w), { x: 600, y: 1000 });
   w.step();
   tick(w, 180);
@@ -87,7 +87,7 @@ function map(seesaw: boolean): MapDefinition {
   };
 }
 it("unbalanced loading tilts a center-pivot seesaw while fixed ground stays fixed", () => {
-  const w = new PhysicsWorld(map(true), ["a"], () => 0.5);
+  const w = new PhysicsWorld(map(true), ["a"], "energy", () => 0.5);
   tick(w, 45);
   const p = w.platformSnapshot()[0];
   expect(p.angle).toBeGreaterThan(0.01);
@@ -98,7 +98,7 @@ it("unbalanced loading tilts a center-pivot seesaw while fixed ground stays fixe
     Math.PI / 4 + 1e-6,
   );
   w.dispose();
-  const fixed = new PhysicsWorld(map(false), ["a"]);
+  const fixed = new PhysicsWorld(map(false), ["a"], "energy");
   tick(fixed, 120);
   const floor = bodies(fixed).find((b) => b.label === "platform")!;
   expect(floor.angle).toBe(0);
@@ -106,8 +106,8 @@ it("unbalanced loading tilts a center-pivot seesaw while fixed ground stays fixe
   fixed.dispose();
 });
 it("symmetric equal weights balance, heavier right-side players produce more right tilt", () => {
-  const equal = new PhysicsWorld(map(true), ["a", "b"]);
-  const heavy = new PhysicsWorld(map(true), ["a", "b"]);
+  const equal = new PhysicsWorld(map(true), ["a", "b"], "energy");
+  const heavy = new PhysicsWorld(map(true), ["a", "b"], "energy");
   heavy.setInput("a", { ...neutralInput(), heavy: true });
   tick(equal, 45);
   tick(heavy, 45);
@@ -119,7 +119,7 @@ it("symmetric equal weights balance, heavier right-side players produce more rig
   heavy.dispose();
 });
 it("simultaneous contact never rewards the same drop twice", () => {
-  const w = new PhysicsWorld(MAPS[0], ["a", "b"], () => 0.5);
+  const w = new PhysicsWorld(MAPS[0], ["a", "b"], "energy", () => 0.5);
   tick(w, 65);
   for (const id of ["a", "b"]) {
     Matter.Body.setPosition(ball(w, id), { x: 600, y: 200 });

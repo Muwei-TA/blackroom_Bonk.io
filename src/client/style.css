@@ -912,3 +912,20 @@ footer b {
     font-size: 25px;
   }
 }
+.game-mode-select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #3b4947;
+  border-radius: 10px;
+  background: #152024;
+  color: #e9eee9;
+  font: inherit;
+}
+.game-mode-select:focus-visible {
+  outline: 2px solid #ccff62;
+  outline-offset: 2px;
+}
+.game-mode-select:disabled {
+  opacity: 0.6;
+}

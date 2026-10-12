@@ -355,3 +355,11 @@
   padding: 9px 5px;
   font-size: 11px;
 }
+.workshop .trial-tools select {
+  width: 130px;
+  min-height: 40px;
+  margin: 0;
+}
+.workshop .trial-tools label {
+  margin: 0;
+}

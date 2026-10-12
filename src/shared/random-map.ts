@@ -1,3 +1,4 @@
+import { mapForMode, type GameMode } from "./game-mode";
 import type { MapDefinition, Platform } from "./maps";
 import { toDefinition } from "./custom-map";
 // Stable seeds allow a generated layout to be reproduced without sharing RNG state.
@@ -10,7 +11,10 @@ export function seededRandom(seed: number) {
     return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
   };
 }
-export function generateRandomMap(seed: number): MapDefinition {
+export function generateRandomMap(
+  seed: number,
+  mode: GameMode = "classic",
+): MapDefinition {
   const random = seededRandom(seed);
   const between = (a: number, b: number) => a + random() * (b - a);
   const balancing = random() < 0.5;
@@ -63,17 +67,30 @@ export function generateRandomMap(seed: number): MapDefinition {
         70,
     };
   });
-  return toDefinition(
-    {
-      format: "blackroom-map",
-      version: 2,
-      map: {
-        name: balancing ? "随机 · 摇摆竞技场" : "随机 · 能量浮岛",
-        subtitle: "能量雨 · 固定与天平地面",
-        platforms,
-        spawns,
+  return mapForMode(
+    toDefinition(
+      {
+        format: "blackroom-map",
+        version: 2,
+        map: {
+          name:
+            mode === "classic"
+              ? balancing
+                ? "随机 · 固定竞技场"
+                : "随机 · 浮空竞技场"
+              : balancing
+                ? "随机 · 摇摆竞技场"
+                : "随机 · 能量浮岛",
+          subtitle:
+            mode === "classic"
+              ? "经典弹球 · 固定地面"
+              : "能量雨 · 固定与天平地面",
+          platforms,
+          spawns,
+        },
       },
-    },
-    "random-" + (seed >>> 0).toString(16),
+      "random-" + mode + "-" + (seed >>> 0).toString(16),
+    ),
+    mode,
   );
 }

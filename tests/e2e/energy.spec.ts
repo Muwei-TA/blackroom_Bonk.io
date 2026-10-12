@@ -34,6 +34,7 @@ test("visual rotation handles, direction buttons, slider and seesaw export", asy
     path: "artifacts/rotation-studio.png",
     fullPage: true,
   });
+  await page.getByLabel("试跑模式", { exact: true }).selectOption("energy");
   await page.getByRole("button", { name: "试跑", exact: true }).click();
   await expect(page.getByTestId("trial-status")).toContainText("能量");
   await page.getByRole("button", { name: "返回编辑", exact: true }).click();
@@ -84,6 +85,10 @@ test("friends receive one random arena and energy gameplay updates", async ({
   await other.getByLabel("房间码", { exact: true }).fill(code!);
   await other.getByRole("button", { name: "加入房间", exact: true }).click();
   await expect(other.getByTestId("room-code")).toHaveText(code!);
+  await page.getByLabel("对战模式", { exact: true }).selectOption("energy");
+  await expect(other.getByLabel("对战模式", { exact: true })).toHaveValue(
+    "energy",
+  );
   await page.getByRole("button", { name: "随机地图", exact: true }).click();
   await expect(other.getByTestId("map-name")).toHaveText(/随机/);
   await expect(

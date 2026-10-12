@@ -1,3 +1,4 @@
+import { mapForMode, type GameMode } from "./game-mode";
 import Matter from "matter-js";
 import {
   PHYSICS,
@@ -33,19 +34,24 @@ export class PhysicsWorld {
     x: number;
     y: number;
   }[] = [];
-  private rain: EnergyRain;
+  private rain: EnergyRain | null;
   constructor(
     private map: MapDefinition,
     ids: string[],
+    mode: GameMode = "classic",
     random: () => number = Math.random,
   ) {
-    this.rain = new EnergyRain(this.engine.world, map, random);
-    for (const [index, p] of map.platforms.entries()) {
+    this.map = mapForMode(map, mode);
+    this.rain =
+      mode === "energy"
+        ? new EnergyRain(this.engine.world, this.map, random)
+        : null;
+    for (const [index, p] of this.map.platforms.entries()) {
       const seesaw = p.motion === "seesaw";
       const body = Bodies.rectangle(p.x, p.y, p.width, p.height, {
         isStatic: !seesaw,
         angle: p.angle,
-        friction: 0.18,
+        friction: mode === "classic" ? 0.15 : 0.18,
         frictionAir: 0.04,
         density: 0.0015,
         label: "platform",
@@ -157,7 +163,7 @@ export class PhysicsWorld {
           Composite.remove(this.engine.world, b.body);
         }
       }
-    this.rain.step(
+    this.rain?.step(
       [...this.balls]
         .filter(([, b]) => b.alive)
         .map(([id, b]) => ({ id, ...b.body.position, radius: b.radius })),
@@ -185,7 +191,7 @@ export class PhysicsWorld {
     }));
   }
   energySnapshot() {
-    return this.rain.snapshot();
+    return this.rain?.snapshot() ?? [];
   }
   snapshot(): BodyView[] {
     return [...this.balls].map(([id, b]) => ({
@@ -201,7 +207,7 @@ export class PhysicsWorld {
     }));
   }
   dispose() {
-    this.rain.dispose();
+    this.rain?.dispose();
     this.platforms = [];
     Composite.clear(this.engine.world, false);
     Engine.clear(this.engine);

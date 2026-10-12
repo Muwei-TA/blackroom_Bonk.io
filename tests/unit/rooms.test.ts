@@ -150,3 +150,32 @@ it("host can leave round settlement and match over; new host can rematch", () =>
     s.r.dispose();
   }
 });
+it("classic is default and only the lobby host may select a synchronized mode", () => {
+  const s = setup();
+  for (const id of ["a", "b", "c"]) s.connect(id);
+  s.r.handle("a", { type: "create", nickname: "A" });
+  expect(s.view("a").mode).toBe("classic");
+  const code = s.view("a").code;
+  s.r.handle("b", { type: "join", nickname: "B", code });
+  s.r.handle("b", { type: "selectMode", mode: "energy" });
+  expect(s.error("b")).toBe("HOST_ONLY");
+  s.r.handle("a", { type: "selectMode", mode: "energy" });
+  expect(s.view("b").mode).toBe("energy");
+  s.r.handle("c", { type: "join", nickname: "C", code });
+  expect(s.view("c").mode).toBe("energy");
+  s.r.handle("a", { type: "selectMap", mapId: "steps" });
+  expect(s.view("a").mode).toBe("energy");
+  s.r.handle("a", { type: "start" });
+  s.r.handle("a", { type: "selectMode", mode: "classic" });
+  expect(s.error("a")).toBe("IN_PROGRESS");
+  s.r.disconnect("c");
+  s.r.disconnect("a");
+  expect(s.view("b")).toMatchObject({
+    mode: "energy",
+    phase: "lobby",
+    hostId: "b",
+  });
+  s.r.handle("b", { type: "selectMode", mode: "classic" });
+  expect(s.view("b").mode).toBe("classic");
+  s.r.dispose();
+});

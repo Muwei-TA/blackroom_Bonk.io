@@ -1,3 +1,4 @@
+import type { GameMode } from "../../shared/game-mode";
 import {
   screenToWorld,
   rotationHandle,
@@ -152,6 +153,7 @@ export function drawEditor(
   bodies?: BodyView[],
   platforms: PlatformView[] = [],
   energies: EnergyView[] = [],
+  mode: GameMode = "classic",
 ) {
   const rect = canvas.getBoundingClientRect(),
     dpr = Math.min(devicePixelRatio || 1, 2);
@@ -182,6 +184,7 @@ export function drawEditor(
   }
   for (const [i, source] of model.draft.map.platforms.entries()) {
     const p = { ...source, ...platforms.find((p) => p.index === i) };
+    if (bodies && mode === "classic") p.motion = "fixed";
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);

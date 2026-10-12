@@ -1,3 +1,4 @@
+import type { GameMode } from "./game-mode";
 import type { MapDefinition } from "./maps";
 import { validateDocument, type MapDocument } from "./custom-map";
 export type InputState = {
@@ -39,6 +40,7 @@ export type PlatformView = {
   angle: number;
 };
 export type RoomView = {
+  mode: GameMode;
   code: string;
   hostId: string;
   mapId: string;
@@ -63,6 +65,7 @@ export type ClientMessage =
   | { type: "create"; nickname: string }
   | { type: "join"; nickname: string; code: string }
   | { type: "selectMap"; mapId: string }
+  | { type: "selectMode"; mode: GameMode }
   | { type: "applyCustomMap"; document: MapDocument }
   | { type: "start" | "rematch" | "leave" | "randomMap" }
   | { type: "input"; seq: number; state: InputState };
@@ -110,6 +113,10 @@ export function parseClientMessage(value: unknown): ClientMessage {
     case "applyCustomMap":
       exact(v, ["type", "document"]);
       return { type: "applyCustomMap", document: validateDocument(v.document) };
+    case "selectMode":
+      exact(v, ["type", "mode"]);
+      if (v.mode !== "classic" && v.mode !== "energy") return invalid();
+      return { type: "selectMode", mode: v.mode };
     case "selectMap":
       exact(v, ["type", "mapId"]);
       if (typeof v.mapId !== "string" || v.mapId.length > 32) return invalid();

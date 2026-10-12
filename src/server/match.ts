@@ -1,3 +1,4 @@
+import type { GameMode } from "../shared/game-mode";
 import {
   COUNTDOWN_MS,
   ROUND_MS,
@@ -27,6 +28,7 @@ export class Match {
   constructor(
     private map: MapDefinition,
     private ids: string[],
+    readonly mode: GameMode = "classic",
   ) {
     this.ids = [...ids];
     for (const id of ids) this.scores.set(id, 0);
@@ -37,7 +39,7 @@ export class Match {
   }
   private nextRound() {
     this.physics?.dispose();
-    this.physics = new PhysicsWorld(this.map, this.ids);
+    this.physics = new PhysicsWorld(this.map, this.ids, this.mode);
     this.round++;
     this.phase = "countdown";
     this.winnerId = null;

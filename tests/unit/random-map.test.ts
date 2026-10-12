@@ -8,10 +8,12 @@ import {
 import { MAPS } from "../../src/shared/maps";
 import { localPoint } from "../../src/shared/geometry";
 it("reproduces seeds, varies layouts, and generates supported safe spawn geometry", () => {
-  expect(generateRandomMap(42)).toEqual(generateRandomMap(42));
+  expect(generateRandomMap(42, "energy")).toEqual(
+    generateRandomMap(42, "energy"),
+  );
   const layouts = new Set<string>();
   for (let seed = 0; seed < 200; seed++) {
-    const m = generateRandomMap(seed);
+    const m = generateRandomMap(seed, "energy");
     validateDocument(toDocument(m));
     expect(m.platforms.some((p) => p.motion === "seesaw")).toBe(true);
     expect(m.platforms.some((p) => p.motion !== "seesaw")).toBe(true);
@@ -31,7 +33,7 @@ it("reproduces seeds, varies layouts, and generates supported safe spawn geometr
 it("loads legacy files and round-trips new seesaw maps", () => {
   const legacy = { ...toDocument(MAPS[0]), version: 1 };
   expect(parseMapFile(JSON.stringify(legacy))).toEqual(legacy);
-  const dynamic = toDocument(generateRandomMap(7));
+  const dynamic = toDocument(generateRandomMap(7, "energy"));
   expect(dynamic.version).toBe(2);
   expect(parseMapFile(JSON.stringify(dynamic))).toEqual(dynamic);
 });
@@ -63,8 +65,9 @@ import { PhysicsWorld } from "../../src/shared/physics";
 it("generated spawn points let all eight players initially land without elimination", () => {
   for (let seed = 0; seed < 40; seed++) {
     const w = new PhysicsWorld(
-      generateRandomMap(seed),
+      generateRandomMap(seed, "energy"),
       Array.from({ length: 8 }, (_, i) => String(i)),
+      "energy",
     );
     for (let i = 0; i < 100; i++) w.step();
     expect(

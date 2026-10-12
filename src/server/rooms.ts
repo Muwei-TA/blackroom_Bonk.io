@@ -1,3 +1,4 @@
+import { GAME_MODES, type GameMode } from "../shared/game-mode";
 import { randomInt, randomUUID } from "node:crypto";
 import { COLORS, MAX_PLAYERS, MAX_ROOMS } from "../shared/constants";
 import { getMap, type MapDefinition } from "../shared/maps";
@@ -13,6 +14,7 @@ import { Match } from "./match";
 type Room = {
   code: string;
   hostId: string;
+  mode: GameMode;
   map: MapDefinition;
   players: Map<string, PlayerView>;
   match: Match | null;
@@ -46,6 +48,7 @@ export class RoomManager {
     return {
       code: r.code,
       hostId: r.hostId,
+      mode: r.mode,
       mapId: r.map.id,
       map: structuredClone(r.map),
       phase: r.match?.phase ?? "lobby",
@@ -84,6 +87,7 @@ export class RoomManager {
         r = {
           code: c,
           hostId: id,
+          mode: "classic",
           map: structuredClone(getMap("origin")),
           players: new Map(),
           match: null,
@@ -119,6 +123,18 @@ export class RoomManager {
     }
     if (r.hostId !== id) return this.error(id, "HOST_ONLY", "只有房主可以操作");
     const phase = r.match?.phase ?? "lobby";
+    if (m.type === "selectMode") {
+      if (phase !== "lobby")
+        return this.error(id, "IN_PROGRESS", "比赛中不能更换模式");
+      r.mode = m.mode;
+      r.notice =
+        "当前模式：" +
+        GAME_MODES[r.mode].name +
+        "。" +
+        GAME_MODES[r.mode].description;
+      this.broadcast(r);
+      return;
+    }
     if (m.type === "applyCustomMap") {
       if (phase !== "lobby")
         return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
@@ -143,9 +159,9 @@ export class RoomManager {
       if (now - (this.lastMapSubmission.get(id) ?? -Infinity) < 1000)
         return this.error(id, "MAP_RATE_LIMIT", "地图生成过于频繁，请稍后重试");
       this.lastMapSubmission.set(id, now);
-      r.map = generateRandomMap(randomInt(0, 0x100000000));
+      r.map = generateRandomMap(randomInt(0, 0x100000000), r.mode);
       r.map.id = "random-" + randomUUID();
-      r.notice = "已生成随机地图：固定地面与天平平台，开局后能量雨启动。";
+      r.notice = "已生成随机地图，当前模式：" + GAME_MODES[r.mode].name;
       this.broadcast(r);
       return;
     }
@@ -166,7 +182,7 @@ export class RoomManager {
       if (r.players.size < 2)
         return this.error(id, "NEED_PLAYERS", "至少需要两位玩家");
       r.match?.dispose();
-      r.match = new Match(r.map, [...r.players.keys()]);
+      r.match = new Match(r.map, [...r.players.keys()], r.mode);
       r.match.tick(this.now());
       r.match.start();
       r.notice = "准备出发！";

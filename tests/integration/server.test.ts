@@ -198,6 +198,8 @@ it("random maps are host-owned, synchronized for later joins and locked during p
   await b.wait("room");
   b.send({ type: "randomMap" });
   expect((await b.wait("error")).code).toBe("HOST_ONLY");
+  a.send({ type: "selectMode", mode: "energy" });
+  await a.wait("room", (m) => m.room.mode === "energy");
   a.send({ type: "randomMap" });
   const room = (await a.wait("room", (m) => m.room.mapId.startsWith("random-")))
     .room;
