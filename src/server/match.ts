@@ -110,6 +110,8 @@ export class Match {
       phase: this.phase,
       remainingMs: Math.max(0, this.deadline - nowMs),
       bodies: this.physics?.snapshot() ?? [],
+      platforms: this.physics?.platformSnapshot() ?? [],
+      energies: this.physics?.energySnapshot() ?? [],
     };
   }
   dispose() {

@@ -27,7 +27,12 @@ export type BodyView = {
   angle: number;
   heavy: boolean;
   alive: boolean;
+  radius: number;
+  energy: number;
+  mass: number;
 };
+export type EnergyView = { id:string; x:number; y:number };
+export type PlatformView = { index:number; x:number; y:number; angle:number };
 export type RoomView = {
   code: string;
   hostId: string;
@@ -46,6 +51,8 @@ export type WorldSnapshot = {
   phase: RoomPhase;
   remainingMs: number;
   bodies: BodyView[];
+  platforms: PlatformView[];
+  energies: EnergyView[];
 };
 export type ClientMessage =
   | { type: "create"; nickname: string }

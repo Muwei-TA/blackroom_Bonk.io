@@ -204,6 +204,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
               angle: 0,
               heavy: false,
               alive: true,
+              radius:20,energy:0,mass:0,
             }))
           : buffer.sample(
               (world?.serverTime ?? 0) + (performance.now() - receivedAt) - 100,

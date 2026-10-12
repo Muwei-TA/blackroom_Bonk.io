@@ -42,3 +42,13 @@ it("rejects forged platform motion, old-format dynamic data, angles and swept bo
   (d.map.platforms[0] as any).motion = "free-fall";
   expect(() => validateDocument(d)).toThrow(/类型/);
 });
+
+import { PhysicsWorld } from "../../src/shared/physics";
+it("generated spawn points let all eight players initially land without elimination", () => {
+  for(let seed=0;seed<40;seed++) {
+    const w=new PhysicsWorld(generateRandomMap(seed),Array.from({length:8},(_,i)=>String(i)));
+    for(let i=0;i<100;i++) w.step();
+    expect(w.snapshot().every(b=>b.alive),`seed ${seed}`).toBe(true);
+    w.dispose();
+  }
+});

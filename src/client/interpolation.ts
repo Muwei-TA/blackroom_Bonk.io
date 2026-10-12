@@ -11,8 +11,9 @@ export class SnapshotBuffer {
   clear() {
     this.frames = [];
   }
-  sample(t: number): BodyView[] {
-    if (!this.frames.length) return [];
+  sample(t: number): BodyView[] { return this.sampleWorld(t).bodies; }
+  sampleWorld(t:number): Pick<WorldSnapshot,"bodies"|"platforms"|"energies"> {
+    if (!this.frames.length) return {bodies:[],platforms:[],energies:[]};
     let a = this.frames[0],
       b = a;
     for (const f of this.frames) {
@@ -30,7 +31,11 @@ export class SnapshotBuffer {
             0,
             Math.min(1, (t - a.serverTime) / (b.serverTime - a.serverTime)),
           );
-    return b.bodies.map((body) => {
+    const lerp=(a:number,b:number)=>a+(b-a)*k;
+    return {
+      platforms:b.platforms.map(p=>{ const old=a.platforms.find(q=>q.index===p.index); return old ? {...p,x:lerp(old.x,p.x),y:lerp(old.y,p.y),angle:lerp(old.angle,p.angle)} : {...p}; }),
+      energies:b.energies.map(e=>{ const old=a.energies.find(q=>q.id===e.id); return old ? {...e,x:lerp(old.x,e.x),y:lerp(old.y,e.y)} : {...e}; }),
+      bodies:b.bodies.map((body) => {
       const old = a.bodies.find((x) => x.id === body.id);
       return !old || !body.alive
         ? { ...body }
@@ -40,6 +45,6 @@ export class SnapshotBuffer {
             y: old.y + (body.y - old.y) * k,
             angle: old.angle + (body.angle - old.angle) * k,
           };
-    });
+    })};
   }
 }
