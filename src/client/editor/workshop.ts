@@ -1,3 +1,6 @@
+import { generateRandomMap } from "../../shared/random-map";
+import { normalizeAngle } from "../../shared/geometry";
+import { SEESAW_MAX_ANGLE } from "../../shared/constants";
 import { MAPS, type MapDefinition, type Platform } from "../../shared/maps";
 import {
   MAX_MAP_BYTES,
@@ -78,6 +81,17 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
     } catch (e) {
       notify((e as Error).message);
     }
+  }
+  function selectedPlatform() {
+    const s = model.selection;
+    return s?.kind === "platform" ? model.draft.map.platforms[s.index] : null;
+  }
+  function setAngle(angle: number) {
+    const p = selectedPlatform();
+    if (!p) return;
+    const max = p.motion === "seesaw" ? SEESAW_MAX_ANGLE : Math.PI;
+    model.edit(() => (p.angle = Math.max(-max, Math.min(max, angle))));
+    refresh();
   }
   function checked() {
     return validateDocument(model.draft);
@@ -181,7 +195,10 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       for (const field of container.querySelectorAll<HTMLInputElement>(
         "[data-property]",
       )) {
-        const key = field.dataset.property! as Exclude<keyof Platform, "motion">;
+        const key = field.dataset.property! as Exclude<
+          keyof Platform,
+          "motion"
+        >;
         const value = (p as Platform)[key];
         if (value !== undefined && document.activeElement !== field)
           field.value = String(
@@ -190,6 +207,23 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
             ) / 100,
           );
       }
+    const platform = selectedPlatform();
+    if (platform) {
+      el<HTMLSelectElement>("editor-motion").value = platform.motion ?? "fixed";
+      const max = platform.motion === "seesaw" ? 45 : 180;
+      const slider = el<HTMLInputElement>("editor-angle-slider");
+      const numeric = container.querySelector<HTMLInputElement>(
+        '[data-property="angle"]',
+      )!;
+      for (const field of [slider, numeric]) {
+        field.min = String(-max);
+        field.max = String(max);
+      }
+      if (document.activeElement !== slider)
+        slider.value = String(Math.round((platform.angle * 180) / Math.PI));
+    }
+    for (const action of ["rotateLeft", "rotateRight"])
+      button(action).disabled = !platform || !!trial;
     let valid = true;
     try {
       checked();
@@ -230,6 +264,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       field.disabled = !!trial;
     for (const action of [
       "new",
+      "random",
       "import",
       "deleteSaved",
       "backup",
@@ -284,6 +319,22 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
         dispose();
         options.close();
       }),
+    random: () =>
+      request(() =>
+        load(
+          toDocument(
+            generateRandomMap(crypto.getRandomValues(new Uint32Array(1))[0]),
+          ),
+        ),
+      ),
+    rotateLeft: () => {
+      const p = selectedPlatform();
+      if (p) setAngle(normalizeAngle(p.angle - Math.PI / 12));
+    },
+    rotateRight: () => {
+      const p = selectedPlatform();
+      if (p) setAngle(normalizeAngle(p.angle + Math.PI / 12));
+    },
     new: () =>
       request(() => {
         const d = toDocument(MAPS[0]);
@@ -463,16 +514,50 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
         return;
       }
       const key = field.dataset.property! as Exclude<keyof Platform, "motion">;
+      if (key === "angle") {
+        setAngle((value * Math.PI) / 180);
+        return;
+      }
       model.edit((d) => {
         const target =
           s.kind === "platform"
             ? d.map.platforms[s.index]
             : d.map.spawns[s.index];
-        (target as Platform)[key] =
-          key === "angle" ? (value * Math.PI) / 180 : value;
+        (target as Platform)[key] = value;
       });
       refresh();
     };
+  el<HTMLSelectElement>("editor-motion").onchange = () => {
+    const p = selectedPlatform();
+    if (!p) return;
+    model.edit((d) => {
+      d.version = 2;
+      p.motion = el<HTMLSelectElement>("editor-motion").value as
+        "fixed" | "seesaw";
+      if (p.motion === "seesaw")
+        p.angle = Math.max(
+          -SEESAW_MAX_ANGLE,
+          Math.min(SEESAW_MAX_ANGLE, p.angle),
+        );
+    });
+    refresh();
+  };
+  const angleSlider = el<HTMLInputElement>("editor-angle-slider");
+  angleSlider.oninput = () => {
+    const p = selectedPlatform();
+    if (!p) return;
+    model.begin();
+    p.angle = (angleSlider.valueAsNumber * Math.PI) / 180;
+    refresh();
+  };
+  const endRotation = () => {
+    model.commit();
+    refresh();
+  };
+  angleSlider.onchange = endRotation;
+  angleSlider.onpointerup = endRotation;
+  angleSlider.onpointercancel = endRotation;
+  angleSlider.onblur = endRotation;
   el<HTMLInputElement>("map-import").onchange = async () => {
     const field = el<HTMLInputElement>("map-import"),
       file = field.files?.[0];
@@ -558,13 +643,20 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
         trial.step();
         accumulator -= STEP_MS;
       }
-      const alive = trial.snapshot()[0]?.alive;
+      const ball = trial.snapshot()[0];
+      const alive = ball?.alive;
       el("trial-status").textContent = alive
-        ? "试跑中 · A/D 移动，W 跳跃，空格加重"
+        ? `试跑中 · 能量 ${ball.energy}/10 · 直径 ${ball.radius * 2} · A/D 移动，W 跳跃，空格加重`
         : "已掉出场地 · 点击重置再试一次";
     }
     last = now;
-    drawEditor(canvas, model, trial?.snapshot());
+    drawEditor(
+      canvas,
+      model,
+      trial?.snapshot(),
+      trial?.platformSnapshot(),
+      trial?.energySnapshot(),
+    );
     raf = requestAnimationFrame(frame);
   }
   function dispose() {

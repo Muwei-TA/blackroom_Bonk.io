@@ -137,9 +137,11 @@ export class RoomManager {
       return;
     }
     if (m.type === "randomMap") {
-      if (phase !== "lobby") return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
+      if (phase !== "lobby")
+        return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
       const now = this.now();
-      if (now - (this.lastMapSubmission.get(id) ?? -Infinity) < 1000) return this.error(id, "MAP_RATE_LIMIT", "地图生成过于频繁，请稍后重试");
+      if (now - (this.lastMapSubmission.get(id) ?? -Infinity) < 1000)
+        return this.error(id, "MAP_RATE_LIMIT", "地图生成过于频繁，请稍后重试");
       this.lastMapSubmission.set(id, now);
       r.map = generateRandomMap(randomInt(0, 0x100000000));
       r.map.id = "random-" + randomUUID();

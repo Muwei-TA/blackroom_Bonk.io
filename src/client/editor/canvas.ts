@@ -1,13 +1,16 @@
 import {
   screenToWorld,
+  rotationHandle,
+  normalizeAngle,
   pointInPlatform,
   localPoint,
   platformCorners,
   type Point,
 } from "../../shared/geometry";
 import type { Platform } from "../../shared/maps";
-import { COLORS } from "../../shared/constants";
-import type { BodyView } from "../../shared/protocol";
+import { drawEnergy, drawPivot } from "../arena-paint";
+import { COLORS, SEESAW_MAX_ANGLE } from "../../shared/constants";
+import type { BodyView, PlatformView, EnergyView } from "../../shared/protocol";
 import { EditorModel } from "./model";
 export function bindEditorCanvas(
   canvas: HTMLCanvasElement,
@@ -16,7 +19,7 @@ export function bindEditorCanvas(
   snap: () => boolean,
 ) {
   let drag: {
-    kind: "move" | "resize";
+    kind: "move" | "resize" | "rotate";
     start: Point;
     original: Point | Platform;
     pointer: number;
@@ -32,8 +35,17 @@ export function bindEditorCanvas(
     const selected = model.selection;
     if (selected?.kind === "platform") {
       const platform = model.draft.map.platforms[selected.index];
+      const handle = rotationHandle(platform);
+      if (Math.hypot(p.x - handle.x, p.y - handle.y) < 18) {
+        drag = {
+          kind: "rotate",
+          start: p,
+          original: { ...platform },
+          pointer: e.pointerId,
+        };
+      }
       const corner = platformCorners(platform)[2];
-      if (Math.hypot(p.x - corner.x, p.y - corner.y) < 18) {
+      if (!drag && Math.hypot(p.x - corner.x, p.y - corner.y) < 18) {
         drag = {
           kind: "resize",
           start: p,
@@ -88,6 +100,17 @@ export function bindEditorCanvas(
         10,
         Math.min(400, rounded(Math.abs(local.y) * 2)),
       );
+    } else if (drag.kind === "rotate" && s.kind === "platform") {
+      const original = drag.original as Platform;
+      const current = model.draft.map.platforms[s.index];
+      let angle = normalizeAngle(
+        original.angle +
+          Math.atan2(p.y - original.y, p.x - original.x) -
+          Math.atan2(drag.start.y - original.y, drag.start.x - original.x),
+      );
+      if (snap()) angle = Math.round(angle / (Math.PI / 36)) * (Math.PI / 36);
+      const max = current.motion === "seesaw" ? SEESAW_MAX_ANGLE : Math.PI;
+      current.angle = Math.max(-max, Math.min(max, angle));
     } else {
       const current =
         s.kind === "platform"
@@ -127,6 +150,8 @@ export function drawEditor(
   canvas: HTMLCanvasElement,
   model: EditorModel,
   bodies?: BodyView[],
+  platforms: PlatformView[] = [],
+  energies: EnergyView[] = [],
 ) {
   const rect = canvas.getBoundingClientRect(),
     dpr = Math.min(devicePixelRatio || 1, 2);
@@ -155,13 +180,14 @@ export function drawEditor(
     ctx.lineTo(1200, y);
     ctx.stroke();
   }
-  for (const [i, p] of model.draft.map.platforms.entries()) {
+  for (const [i, source] of model.draft.map.platforms.entries()) {
+    const p = { ...source, ...platforms.find((p) => p.index === i) };
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);
     ctx.fillStyle = "#40524c";
     ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
-    ctx.fillStyle = "#b8d895";
+    ctx.fillStyle = p.motion === "seesaw" ? "#ffe28c" : "#b8d895";
     ctx.fillRect(-p.width / 2, -p.height / 2, p.width, 3);
     ctx.strokeStyle =
       model.selection?.kind === "platform" && model.selection.index === i
@@ -170,16 +196,35 @@ export function drawEditor(
     ctx.lineWidth = 2;
     ctx.strokeRect(-p.width / 2, -p.height / 2, p.width, p.height);
     ctx.restore();
+    drawPivot(ctx, p);
     if (
       !bodies &&
       model.selection?.kind === "platform" &&
       model.selection.index === i
     ) {
+      const handle = rotationHandle(p);
+      ctx.strokeStyle = "#ccff62";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(handle.x, handle.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(handle.x, handle.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = "#26382a";
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = "bold 18px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ccff62";
+      ctx.fillText("↻", handle.x, handle.y);
       const corner = platformCorners(p)[2];
       ctx.fillStyle = "#ccff62";
       ctx.fillRect(corner.x - 7, corner.y - 7, 14, 14);
     }
   }
+  for (const energy of energies) drawEnergy(ctx, energy);
   if (!bodies)
     for (const [i, p] of model.draft.map.spawns.entries()) {
       ctx.beginPath();
@@ -203,13 +248,13 @@ export function drawEditor(
       if (!b.alive) continue;
       ctx.fillStyle = "#ccff62";
       ctx.beginPath();
-      ctx.arc(b.x, b.y, 20, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
       ctx.fill();
       if (b.heavy) {
         ctx.strokeStyle = "#ccff62";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, 28, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, b.radius + 8, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.fillStyle = "#18211d";

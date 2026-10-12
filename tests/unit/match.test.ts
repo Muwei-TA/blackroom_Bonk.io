@@ -77,3 +77,28 @@ it("old sequences ignored and stale input cleared", () => {
   expect(b.velocity.x).toBeCloseTo(0);
   m.dispose();
 });
+it("new rounds clear collected growth and old drops in authoritative snapshots", () => {
+  const m = make();
+  m.tick(3000);
+  for (let i = 1; i <= 65; i++) m.tick(3000 + i * 17);
+  const w = m.physics!,
+    all = Matter.Composite.allBodies(w.engine.world);
+  const a = all.find((b) => b.label === "a")!;
+  const energy = w.energySnapshot()[0];
+  Matter.Body.setPosition(
+    all.find((b) => b.label === energy.id)!,
+    a.position,
+  );
+  m.tick(4122);
+  expect(m.snapshot(1, 4122).bodies.find((b) => b.id === "a")!.energy).toBe(1);
+  drop(m, "b");
+  m.tick(4139);
+  m.tick(7140);
+  const fresh = m.snapshot(2, 7140);
+  expect(fresh.phase).toBe("countdown");
+  expect(fresh.energies).toEqual([]);
+  expect(fresh.bodies.every((b) => b.energy === 0 && b.radius === 20)).toBe(
+    true,
+  );
+  m.dispose();
+});

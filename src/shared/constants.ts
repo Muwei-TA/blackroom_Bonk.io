@@ -26,4 +26,12 @@ export const PHYSICS = {
 };
 
 export const SEESAW_MAX_ANGLE = Math.PI / 4;
-export const ENERGY = { radius: 10, firstDropMs: 1000, intervalMs: 3000, lifetimeMs: 15000, maxDrops: 16, maxStacks: 10, radiusPerStack: 2 };
+export const ENERGY = {
+  radius: 10,
+  firstDropMs: 1000,
+  intervalMs: 3000,
+  lifetimeMs: 15000,
+  maxDrops: 16,
+  maxStacks: 10,
+  radiusPerStack: 2,
+};

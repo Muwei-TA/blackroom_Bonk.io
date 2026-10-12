@@ -1,6 +1,10 @@
 import { it, expect } from "vitest";
 import { generateRandomMap } from "../../src/shared/random-map";
-import { toDocument, validateDocument, parseMapFile } from "../../src/shared/custom-map";
+import {
+  toDocument,
+  validateDocument,
+  parseMapFile,
+} from "../../src/shared/custom-map";
 import { MAPS } from "../../src/shared/maps";
 import { localPoint } from "../../src/shared/geometry";
 it("reproduces seeds, varies layouts, and generates supported safe spawn geometry", () => {
@@ -9,12 +13,17 @@ it("reproduces seeds, varies layouts, and generates supported safe spawn geometr
   for (let seed = 0; seed < 200; seed++) {
     const m = generateRandomMap(seed);
     validateDocument(toDocument(m));
-    expect(m.platforms.some(p => p.motion === "seesaw")).toBe(true);
-    expect(m.platforms.some(p => p.motion !== "seesaw")).toBe(true);
-    for (const s of m.spawns) expect(m.platforms.some(p => {
-      const local = localPoint(s, p);
-      return Math.abs(local.x) < p.width / 2 - 20 && local.y < -p.height / 2;
-    })).toBe(true);
+    expect(m.platforms.some((p) => p.motion === "seesaw")).toBe(true);
+    expect(m.platforms.some((p) => p.motion !== "seesaw")).toBe(true);
+    for (const s of m.spawns)
+      expect(
+        m.platforms.some((p) => {
+          const local = localPoint(s, p);
+          return (
+            Math.abs(local.x) < p.width / 2 - 20 && local.y < -p.height / 2
+          );
+        }),
+      ).toBe(true);
     layouts.add(JSON.stringify(m.platforms));
   }
   expect(layouts.size).toBeGreaterThan(190);
@@ -31,7 +40,14 @@ it("rejects forged platform motion, old-format dynamic data, angles and swept bo
   d.map.platforms[0].motion = "seesaw";
   d.version = 2;
   expect(() => validateDocument(d)).toThrow(/区域/);
-  d.map.platforms[0] = { x:600,y:400,width:600,height:26,angle:0,motion:"seesaw" };
+  d.map.platforms[0] = {
+    x: 600,
+    y: 400,
+    width: 600,
+    height: 26,
+    angle: 0,
+    motion: "seesaw",
+  };
   expect(() => validateDocument(d)).not.toThrow();
   d.map.platforms[0].angle = Math.PI / 2;
   expect(() => validateDocument(d)).toThrow(/天平/);
@@ -45,10 +61,16 @@ it("rejects forged platform motion, old-format dynamic data, angles and swept bo
 
 import { PhysicsWorld } from "../../src/shared/physics";
 it("generated spawn points let all eight players initially land without elimination", () => {
-  for(let seed=0;seed<40;seed++) {
-    const w=new PhysicsWorld(generateRandomMap(seed),Array.from({length:8},(_,i)=>String(i)));
-    for(let i=0;i<100;i++) w.step();
-    expect(w.snapshot().every(b=>b.alive),`seed ${seed}`).toBe(true);
+  for (let seed = 0; seed < 40; seed++) {
+    const w = new PhysicsWorld(
+      generateRandomMap(seed),
+      Array.from({ length: 8 }, (_, i) => String(i)),
+    );
+    for (let i = 0; i < 100; i++) w.step();
+    expect(
+      w.snapshot().every((b) => b.alive),
+      `seed ${seed}`,
+    ).toBe(true);
     w.dispose();
   }
 });

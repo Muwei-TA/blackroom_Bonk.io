@@ -31,8 +31,13 @@ export type BodyView = {
   energy: number;
   mass: number;
 };
-export type EnergyView = { id:string; x:number; y:number };
-export type PlatformView = { index:number; x:number; y:number; angle:number };
+export type EnergyView = { id: string; x: number; y: number };
+export type PlatformView = {
+  index: number;
+  x: number;
+  y: number;
+  angle: number;
+};
 export type RoomView = {
   code: string;
   hostId: string;

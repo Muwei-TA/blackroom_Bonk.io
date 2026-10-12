@@ -1,4 +1,5 @@
-import { MAPS, getMap } from "../shared/maps";
+import { RADIUS, ENERGY, PHYSICS } from "../shared/constants";
+import { MAPS } from "../shared/maps";
 import { openWorkshop } from "./editor/workshop";
 import type {
   ClientMessage,
@@ -25,12 +26,14 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
  </section>
  <section id="room" class="room-layout" hidden>
  <div class="arena-column"><div class="arena-heading"><div><div class="eyebrow">PRIVATE ARENA</div><h2 data-testid="map-name" id="map-name">起点站</h2></div><div class="round-pill"><span id="round-label">自由准备</span><b id="timer">—</b></div></div>
- <div class="arena"><div class="arena-top"><span class="status-dot"></span><span id="phase" data-testid="phase">等待朋友加入</span><span class="first-to">先赢 5 回合获胜</span></div><canvas id="arena-canvas" aria-label="实时物理对战场地"></canvas><div id="overlay" class="arena-overlay"><b id="overlay-title"></b><p id="overlay-subtitle"></p></div><div class="arena-bottom"><span id="self-status" data-testid="self-status">等待开场</span><span>稳住，别掉下去。</span></div></div>
+ <div class="arena"><div class="arena-top"><span class="status-dot"></span><span id="phase" data-testid="phase">等待朋友加入</span><span class="first-to">先赢 5 回合获胜</span></div><canvas id="arena-canvas" aria-label="实时物理对战场地"></canvas><div id="overlay" class="arena-overlay"><b id="overlay-title"></b><p id="overlay-subtitle"></p></div><div class="arena-bottom"><span id="self-status" data-testid="self-status">等待开场</span><span>抢能量，变大变重。</span></div></div>
  <div class="arena-tip"><span>↳</span><p id="notice">邀请朋友，开始一场友好的较量。</p></div>
  </div>
  <aside class="room-sidebar"><div class="room-code-box"><span class="small-label">你的专属房间</span><div class="code-line"><strong id="room-code" data-testid="room-code"></strong><button id="copy" class="icon-button" aria-label="复制房间码">⧉</button></div><p class="muted">把房间码发给朋友，一起入场</p></div>
  <div class="roster-heading"><h3>场上好友</h3><span id="player-count">1 / 8</span></div><ul id="players" data-testid="players"></ul>
+ <p id="growth-status" data-testid="growth-status" class="field-hint">能量雨 · 每轮成长重置</p>
  <div class="map-heading"><h3>选择竞技场</h3><span>房主设置</span></div><div id="map-options" class="map-options"></div>
+ <button id="random-map" class="button secondary custom-map-button">随机地图</button>
  <button id="custom-map" class="button secondary custom-map-button">自定义地图</button>
  <button id="start" class="button primary">开始比赛</button><button id="rematch" class="button primary" hidden>返回准备页</button><p id="start-hint" class="field-hint">至少 2 人即可开始</p><button id="leave" class="leave-button">离开房间</button></aside>
  </section>
@@ -64,6 +67,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   };
   el("open-workshop").onclick = launchWorkshop;
   el("custom-map").onclick = launchWorkshop;
+  el("random-map").onclick = () => send({ type: "randomMap" });
   const error = (message: string) => {
     el("error").textContent = message;
     el("error").hidden = false;
@@ -166,6 +170,8 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     }
     const host = room.hostId === selfId,
       lobby = room.phase === "lobby";
+    el<HTMLButtonElement>("random-map").disabled =
+      !connected || room.hostId !== selfId || room.phase !== "lobby";
     el<HTMLButtonElement>("custom-map").disabled =
       !connected || !host || !lobby;
     el<HTMLButtonElement>("start").disabled =
@@ -196,6 +202,9 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   function frame() {
     if (room) {
       const map = room.map;
+      const sampled = buffer.sampleWorld(
+        (world?.serverTime ?? 0) + (performance.now() - receivedAt) - 100,
+      );
       const bodies: BodyView[] =
         room.phase === "lobby"
           ? room.players.map((p, i) => ({
@@ -204,19 +213,25 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
               angle: 0,
               heavy: false,
               alive: true,
-              radius:20,energy:0,mass:0,
+              radius: 20,
+              energy: 0,
+              mass: 0,
             }))
-          : buffer.sample(
-              (world?.serverTime ?? 0) + (performance.now() - receivedAt) - 100,
-            );
+          : sampled.bodies;
       renderFrame(
         el<HTMLCanvasElement>("arena-canvas").getContext("2d")!,
         map,
         bodies,
         room.players,
         selfId,
+        room.phase === "lobby" ? [] : sampled.platforms,
+        room.phase === "lobby" ? [] : sampled.energies,
       );
       const self = bodies.find((b) => b.id === selfId);
+      el("growth-status").textContent =
+        self && room.phase !== "lobby"
+          ? `能量 ${self.energy} / ${ENERGY.maxStacks} · 直径 ${Math.round(self.radius * 2)} · 重量 ${((self.radius / RADIUS) ** 2 * (self.heavy ? PHYSICS.heavyMultiplier : 1)).toFixed(1)}×`
+          : "能量雨 · 吃能量变大变重，每轮重置";
       el("self-status").textContent =
         room.phase === "lobby"
           ? "等待开场"

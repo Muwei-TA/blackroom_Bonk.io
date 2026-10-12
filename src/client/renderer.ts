@@ -1,12 +1,20 @@
+import { drawEnergy, drawPivot } from "./arena-paint";
 import { RADIUS, COLORS } from "../shared/constants";
 import type { MapDefinition } from "../shared/maps";
-import type { BodyView, PlayerView } from "../shared/protocol";
+import type {
+  BodyView,
+  PlayerView,
+  PlatformView,
+  EnergyView,
+} from "../shared/protocol";
 export function renderFrame(
   ctx: CanvasRenderingContext2D,
   map: MapDefinition,
   bodies: BodyView[],
   players: PlayerView[] = [],
   selfId = "",
+  platforms: PlatformView[] = [],
+  energies: EnergyView[] = [],
 ) {
   const canvas = ctx.canvas;
   const w = canvas.clientWidth,
@@ -43,7 +51,8 @@ export function renderFrame(
   ctx.textAlign = "center";
   ctx.fillStyle = "#586263";
   ctx.fillText("BLACKROOM  /  ARENA", 600, 140);
-  for (const p of map.platforms) {
+  for (const [index, source] of map.platforms.entries()) {
+    const p = { ...source, ...platforms.find((p) => p.index === index) };
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);
@@ -51,15 +60,18 @@ export function renderFrame(
     ctx.fillRect(-p.width / 2 + 7, -p.height / 2 + 9, p.width, p.height);
     ctx.fillStyle = "#39474a";
     ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
-    ctx.fillStyle = "#b8d895";
+    ctx.fillStyle = p.motion === "seesaw" ? "#ffe28c" : "#b8d895";
     ctx.fillRect(-p.width / 2, -p.height / 2, p.width, 4);
     ctx.strokeStyle = "#566766";
     ctx.strokeRect(-p.width / 2, -p.height / 2, p.width, p.height);
     ctx.restore();
+    drawPivot(ctx, p);
   }
+  for (const energy of energies) drawEnergy(ctx, energy);
   for (const [index, b] of bodies.entries()) {
     if (!b.alive) continue;
     const player = players.find((p) => p.id === b.id);
+    const radius = b.radius ?? RADIUS;
     const color = player?.color ?? COLORS[index % COLORS.length];
     ctx.save();
     ctx.translate(b.x, b.y);
@@ -68,7 +80,7 @@ export function renderFrame(
       ctx.lineWidth = 3;
       ctx.setLineDash([5, 4]);
       ctx.beginPath();
-      ctx.arc(0, 0, RADIUS + 9, 0, Math.PI * 2);
+      ctx.arc(0, 0, radius + 9, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -76,9 +88,11 @@ export function renderFrame(
     ctx.shadowColor = color + "50";
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.scale(radius / RADIUS, radius / RADIUS);
     ctx.fillStyle = "#18201d";
     ctx.beginPath();
     ctx.arc(-6, -3, 2.5, 0, Math.PI * 2);
@@ -89,15 +103,21 @@ export function renderFrame(
     ctx.beginPath();
     ctx.arc(0, 1, 7, 0.15, Math.PI - 0.15);
     ctx.stroke();
+    ctx.restore();
+    if (b.energy) {
+      ctx.fillStyle = "#ffe28c";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("⚡ " + b.energy, 0, radius + 18);
+    }
     ctx.font = "500 14px sans-serif";
     ctx.fillStyle = "#e9eee9";
-    ctx.fillText(player?.nickname ?? "", 0, -42);
+    ctx.fillText(player?.nickname ?? "", 0, -radius - 22);
     if (b.id === selfId) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.moveTo(-5, -65);
-      ctx.lineTo(5, -65);
-      ctx.lineTo(0, -58);
+      ctx.moveTo(-5, -radius - 45);
+      ctx.lineTo(5, -radius - 45);
+      ctx.lineTo(0, -radius - 38);
       ctx.fill();
     }
     ctx.restore();

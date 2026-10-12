@@ -345,3 +345,13 @@
     display: none;
   }
 }
+.workshop .angle-slider {
+  padding: 0;
+  height: 28px;
+  margin: 6px 0 12px;
+  accent-color: #ccff62;
+}
+#platform-properties .tool-pair button {
+  padding: 9px 5px;
+  font-size: 11px;
+}

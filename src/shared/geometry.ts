@@ -45,3 +45,17 @@ export function screenToWorld(
     y: ((y - rect.top) * 800) / rect.height,
   };
 }
+
+export function normalizeAngle(angle: number) {
+  return (
+    ((((angle + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) -
+    Math.PI
+  );
+}
+export function rotationHandle(p: Platform): Point {
+  const distance = p.height / 2 + 30;
+  return {
+    x: p.x + Math.sin(p.angle) * distance,
+    y: p.y - Math.cos(p.angle) * distance,
+  };
+}

@@ -187,3 +187,38 @@ it("invalid maps do not replace existing map and oversized frames close", async 
   a.ws.send(" ".repeat(32769));
   expect(await closed).toBe(1009);
 });
+it("random maps are host-owned, synchronized for later joins and locked during play", async () => {
+  const f = await fixture(),
+    a = await client(f.port),
+    b = await client(f.port),
+    c = await client(f.port);
+  a.send({ type: "create", nickname: "A" });
+  const code = (await a.wait("room")).room.code;
+  b.send({ type: "join", nickname: "B", code });
+  await b.wait("room");
+  b.send({ type: "randomMap" });
+  expect((await b.wait("error")).code).toBe("HOST_ONLY");
+  a.send({ type: "randomMap" });
+  const room = (await a.wait("room", (m) => m.room.mapId.startsWith("random-")))
+    .room;
+  expect(room.map.platforms.some((p: any) => p.motion === "seesaw")).toBe(true);
+  expect(
+    (await b.wait("room", (m) => m.room.mapId === room.mapId)).room.map,
+  ).toEqual(room.map);
+  c.send({ type: "join", nickname: "C", code });
+  expect((await c.wait("room")).room.map).toEqual(room.map);
+  a.send({ type: "start" });
+  const snap = (await a.wait("snapshot", (m) => m.world.phase === "playing"))
+    .world;
+  expect(snap.platforms.length).toBeGreaterThan(0);
+  expect(
+    snap.bodies.every(
+      (p: any) => p.radius === 20 && p.energy === 0 && p.mass > 0,
+    ),
+  ).toBe(true);
+  a.send({ type: "randomMap" });
+  expect((await a.wait("error")).code).toBe("IN_PROGRESS");
+  const rain = (await a.wait("snapshot", (m) => m.world.energies.length > 0))
+    .world;
+  expect(rain.energies[0].y).toBeLessThan(100);
+}, 15000);
