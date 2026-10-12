@@ -1,9 +1,117 @@
-import {it,expect} from 'vitest';
-import {RoomManager} from '../../src/server/rooms';
-import type {ServerMessage,RoomView} from '../../src/shared/protocol';
-function setup(){let now=0;const out=new Map<string,ServerMessage[]>();let n=0;const r=new RoomManager((id,m)=>out.set(id,[...(out.get(id)??[]),m]),()=>now,()=>`AB${String(++n).padStart(4,'2')}`);const connect=(id:string)=>r.connect(id);const view=(id:string)=>(out.get(id)!.filter(m=>m.type==='room').at(-1) as {type:'room';room:RoomView}).room;const error=(id:string)=>(out.get(id)!.at(-1) as {code:string}).code;return {r,out,connect,view,error,time:(t:number)=>{now=t;r.tick(t);}};}
-it('host permissions, map choice, join restrictions and host transfer',()=>{const s=setup();for(const id of ['a','b','c'])s.connect(id);s.r.handle('a',{type:'create',nickname:'A'});const code=s.view('a').code;s.r.handle('a',{type:'start'});expect(s.error('a')).toBe('NEED_PLAYERS');s.r.handle('b',{type:'join',nickname:'B',code});s.r.handle('b',{type:'selectMap',mapId:'steps'});expect(s.error('b')).toBe('HOST_ONLY');s.r.handle('b',{type:'start'});expect(s.error('b')).toBe('HOST_ONLY');s.r.handle('a',{type:'selectMap',mapId:'steps'});expect(s.view('b').mapId).toBe('steps');s.r.handle('a',{type:'start'});expect(s.view('b').phase).toBe('countdown');s.r.handle('c',{type:'join',nickname:'C',code});expect(s.error('c')).toBe('IN_PROGRESS');s.r.disconnect('a');expect(s.view('b').hostId).toBe('b');expect(s.view('b').phase).toBe('lobby');s.r.disconnect('b');s.r.disconnect('b');s.r.handle('c',{type:'join',nickname:'C',code});expect(s.error('c')).toBe('NOT_FOUND');s.r.dispose();});
-it('limits players and does not allow duplicate membership',()=>{const s=setup();s.connect('0');s.r.handle('0',{type:'create',nickname:'x'});const code=s.view('0').code;s.r.handle('0',{type:'create',nickname:'x'});expect(s.error('0')).toBe('ALREADY_JOINED');for(let i=1;i<9;i++){s.connect(String(i));s.r.handle(String(i),{type:'join',nickname:'x',code});}expect(s.view('0').players).toHaveLength(8);expect(s.error('8')).toBe('FULL');s.r.dispose();});
-it('limits total rooms to 100',()=>{let n=0;const out:ServerMessage[]=[];const r=new RoomManager((_id,m)=>out.push(m),()=>0,()=>String(++n).padStart(6,'A'));for(let i=0;i<101;i++){r.connect(String(i));r.handle(String(i),{type:'create',nickname:'x'});}expect(out.at(-1)).toMatchObject({type:'error',code:'CAPACITY'});r.dispose();});
-it('regenerates a conflicting room code',()=>{const codes=['ABCDEF','ABCDEF','BCDEFG'];const out:ServerMessage[]=[];const r=new RoomManager((_id,m)=>out.push(m),()=>0,()=>codes.shift()!);for(const id of ['a','b']){r.connect(id);r.handle(id,{type:'create',nickname:id});}expect(out.at(-1)).toMatchObject({type:'room',room:{code:'BCDEFG'}});r.dispose();});
-it('leaving a three player active match transfers host without abort',()=>{const s=setup();for(const id of ['a','b','c'])s.connect(id);s.r.handle('a',{type:'create',nickname:'a'});for(const id of ['b','c'])s.r.handle(id,{type:'join',nickname:id,code:s.view('a').code});s.r.handle('a',{type:'start'});s.time(3000);s.r.disconnect('a');expect(s.view('b')).toMatchObject({hostId:'b',phase:'playing'});s.r.dispose();});
+import { it, expect } from "vitest";
+import { RoomManager } from "../../src/server/rooms";
+import type { ServerMessage, RoomView } from "../../src/shared/protocol";
+function setup() {
+  let now = 0;
+  const out = new Map<string, ServerMessage[]>();
+  let n = 0;
+  const r = new RoomManager(
+    (id, m) => out.set(id, [...(out.get(id) ?? []), m]),
+    () => now,
+    () => `AB${String(++n).padStart(4, "2")}`,
+  );
+  const connect = (id: string) => r.connect(id);
+  const view = (id: string) =>
+    (
+      out
+        .get(id)!
+        .filter((m) => m.type === "room")
+        .at(-1) as { type: "room"; room: RoomView }
+    ).room;
+  const error = (id: string) => (out.get(id)!.at(-1) as { code: string }).code;
+  return {
+    r,
+    out,
+    connect,
+    view,
+    error,
+    time: (t: number) => {
+      now = t;
+      r.tick(t);
+    },
+  };
+}
+it("host permissions, map choice, join restrictions and host transfer", () => {
+  const s = setup();
+  for (const id of ["a", "b", "c"]) s.connect(id);
+  s.r.handle("a", { type: "create", nickname: "A" });
+  const code = s.view("a").code;
+  s.r.handle("a", { type: "start" });
+  expect(s.error("a")).toBe("NEED_PLAYERS");
+  s.r.handle("b", { type: "join", nickname: "B", code });
+  s.r.handle("b", { type: "selectMap", mapId: "steps" });
+  expect(s.error("b")).toBe("HOST_ONLY");
+  s.r.handle("b", { type: "start" });
+  expect(s.error("b")).toBe("HOST_ONLY");
+  s.r.handle("a", { type: "selectMap", mapId: "steps" });
+  expect(s.view("b").mapId).toBe("steps");
+  s.r.handle("a", { type: "start" });
+  expect(s.view("b").phase).toBe("countdown");
+  s.r.handle("c", { type: "join", nickname: "C", code });
+  expect(s.error("c")).toBe("IN_PROGRESS");
+  s.r.disconnect("a");
+  expect(s.view("b").hostId).toBe("b");
+  expect(s.view("b").phase).toBe("lobby");
+  s.r.disconnect("b");
+  s.r.disconnect("b");
+  s.r.handle("c", { type: "join", nickname: "C", code });
+  expect(s.error("c")).toBe("NOT_FOUND");
+  s.r.dispose();
+});
+it("limits players and does not allow duplicate membership", () => {
+  const s = setup();
+  s.connect("0");
+  s.r.handle("0", { type: "create", nickname: "x" });
+  const code = s.view("0").code;
+  s.r.handle("0", { type: "create", nickname: "x" });
+  expect(s.error("0")).toBe("ALREADY_JOINED");
+  for (let i = 1; i < 9; i++) {
+    s.connect(String(i));
+    s.r.handle(String(i), { type: "join", nickname: "x", code });
+  }
+  expect(s.view("0").players).toHaveLength(8);
+  expect(s.error("8")).toBe("FULL");
+  s.r.dispose();
+});
+it("limits total rooms to 100", () => {
+  let n = 0;
+  const out: ServerMessage[] = [];
+  const r = new RoomManager(
+    (_id, m) => out.push(m),
+    () => 0,
+    () => String(++n).padStart(6, "A"),
+  );
+  for (let i = 0; i < 101; i++) {
+    r.connect(String(i));
+    r.handle(String(i), { type: "create", nickname: "x" });
+  }
+  expect(out.at(-1)).toMatchObject({ type: "error", code: "CAPACITY" });
+  r.dispose();
+});
+it("regenerates a conflicting room code", () => {
+  const codes = ["ABCDEF", "ABCDEF", "BCDEFG"];
+  const out: ServerMessage[] = [];
+  const r = new RoomManager(
+    (_id, m) => out.push(m),
+    () => 0,
+    () => codes.shift()!,
+  );
+  for (const id of ["a", "b"]) {
+    r.connect(id);
+    r.handle(id, { type: "create", nickname: id });
+  }
+  expect(out.at(-1)).toMatchObject({ type: "room", room: { code: "BCDEFG" } });
+  r.dispose();
+});
+it("leaving a three player active match transfers host without abort", () => {
+  const s = setup();
+  for (const id of ["a", "b", "c"]) s.connect(id);
+  s.r.handle("a", { type: "create", nickname: "a" });
+  for (const id of ["b", "c"])
+    s.r.handle(id, { type: "join", nickname: id, code: s.view("a").code });
+  s.r.handle("a", { type: "start" });
+  s.time(3000);
+  s.r.disconnect("a");
+  expect(s.view("b")).toMatchObject({ hostId: "b", phase: "playing" });
+  s.r.dispose();
+});

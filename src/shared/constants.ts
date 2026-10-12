@@ -6,5 +6,21 @@ export const WIN_SCORE = 5;
 export const MAX_PLAYERS = 8;
 export const MAX_ROOMS = 100;
 export const RADIUS = 20;
-export const COLORS = ['#ccff62','#9b8cff','#ff9478','#64d9ff','#ff80b5','#ffd965','#67e5b0','#dedbff'];
-export const PHYSICS = { density: 0.002, heavyMultiplier: 4, force: 0.0013, heavyForce: 0.00035, maxSpeed: 7, jumpSpeed: 10.5 };
+export const COLORS = [
+  "#ccff62",
+  "#9b8cff",
+  "#ff9478",
+  "#64d9ff",
+  "#ff80b5",
+  "#ffd965",
+  "#67e5b0",
+  "#dedbff",
+];
+export const PHYSICS = {
+  density: 0.002,
+  heavyMultiplier: 4,
+  force: 0.0013,
+  heavyForce: 0.00035,
+  maxSpeed: 7,
+  jumpSpeed: 10.5,
+};
