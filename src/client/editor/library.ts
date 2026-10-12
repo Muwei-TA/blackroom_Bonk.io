@@ -1,4 +1,8 @@
-import { withLibraryLock, type Exclusive } from "./storage-lock";
+import {
+  withLibraryLock,
+  type Exclusive,
+  type LibraryTransaction,
+} from "./storage-lock";
 import { validateDocument, type MapDocument } from "../../shared/custom-map";
 export const LIBRARY_KEY = "blackroom.maps.v1";
 export type MapEntry = {
@@ -25,8 +29,7 @@ export class MapLibrary {
       throw Error("无法读取本地地图，请检查浏览器存储权限");
     }
   }
-  read() {
-    const raw = this.raw();
+  read(raw = this.raw()) {
     let entries: unknown[] = [];
     try {
       if (raw) {
@@ -73,23 +76,27 @@ export class MapLibrary {
       rawEntries: entries,
     };
   }
-  private write(entries: unknown[]) {
+  private write(entries: unknown[], transaction?: LibraryTransaction) {
     try {
-      this.storage.setItem(
-        LIBRARY_KEY,
-        JSON.stringify({ version: 1, entries }),
-      );
+      const raw = JSON.stringify({ version: 1, entries });
+      this.storage.setItem(LIBRARY_KEY, raw);
+      transaction?.publish(raw);
     } catch {
       throw Error("保存失败：浏览器存储不可用或空间不足，请导出备份");
     }
   }
   save(document: MapDocument, previous?: MapEntry): Promise<MapEntry> {
-    return this.exclusive(() => this.saveLocked(document, previous));
+    return this.exclusive((tx) => this.saveLocked(document, previous, tx));
   }
-  private saveLocked(document: MapDocument, previous?: MapEntry): MapEntry {
+  private saveLocked(
+    document: MapDocument,
+    previous?: MapEntry,
+    transaction?: LibraryTransaction,
+  ): MapEntry {
     const d = validateDocument(document),
-      state = this.read();
-    if (state.corrupt) throw Error("地图库损坏，请先备份并显式重置");
+      state = this.read(transaction?.latest);
+    if (this.read().corrupt || state.corrupt)
+      throw Error("地图库损坏，请先备份并显式重置");
     if (previous) {
       const latest = state.entries.find((e) => e.id === previous.id);
       if (!latest || latest.revision !== previous.revision)
@@ -105,23 +112,25 @@ export class MapLibrary {
     const entries = state.rawEntries.filter(
       (e) => !previous || (e as MapEntry)?.id !== previous.id,
     );
-    this.write([...entries, entry]);
+    this.write([...entries, entry], transaction);
     return entry;
   }
   remove(entry: MapEntry) {
-    return this.exclusive(() => this.removeLocked(entry));
+    return this.exclusive((tx) => this.removeLocked(entry, tx));
   }
-  private removeLocked(entry: MapEntry) {
-    const state = this.read();
-    if (state.corrupt) throw Error("地图库损坏，请先备份");
+  private removeLocked(entry: MapEntry, transaction?: LibraryTransaction) {
+    const state = this.read(transaction?.latest);
+    if (this.read().corrupt || state.corrupt)
+      throw Error("地图库损坏，请先备份");
     const latest = state.entries.find((e) => e.id === entry.id);
     if (!latest || latest.revision !== entry.revision)
       throw Error("删除冲突：请刷新地图库");
     this.write(
       state.rawEntries.filter((e) => (e as MapEntry)?.id !== entry.id),
+      transaction,
     );
   }
   reset() {
-    return this.exclusive(() => this.write([]));
+    return this.exclusive((tx) => this.write([], tx));
   }
 }

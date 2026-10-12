@@ -75,3 +75,34 @@ it("saves on HTTP LAN deployments without secure-context randomUUID", async () =
     vi.unstubAllGlobals();
   }
 });
+it("uses the transactional latest library when a tab's localStorage cache is stale", async () => {
+  let latest: string | undefined;
+  const transaction = async <T>(
+    operation: (
+      tx?: import("../../src/client/editor/storage-lock").LibraryTransaction,
+    ) => T,
+  ) =>
+    operation({
+      latest,
+      publish: (raw) => {
+        latest = raw;
+      },
+    });
+  class Cached extends Memory {
+    override getItem() {
+      return null;
+    }
+  }
+  const a = new MapLibrary(new Cached(), transaction),
+    b = new MapLibrary(new Cached(), transaction);
+  const one = await a.save(doc());
+  const two = await b.save(doc());
+  expect(JSON.parse(latest!).entries.map((e: any) => e.id)).toEqual([
+    one.id,
+    two.id,
+  ]);
+  const changed = await a.save(doc(), one);
+  await expect(b.save(doc(), one)).rejects.toThrow(/冲突/);
+  await b.remove(two);
+  expect(JSON.parse(latest!).entries[0].revision).toBe(changed.revision);
+});

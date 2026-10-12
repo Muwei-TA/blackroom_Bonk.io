@@ -1,6 +1,13 @@
 // IndexedDB readwrite transactions serialize across tabs, including HTTP LAN
-// origins where Web Locks is unavailable. Map contents remain in localStorage.
-export type Exclusive = <T>(operation: () => T) => Promise<T>;
+// origins where Web Locks is unavailable. The latest committed library also
+// lives in this transaction, since localStorage caches may lag across tabs.
+export type LibraryTransaction = {
+  latest?: string;
+  publish: (raw: string) => void;
+};
+export type Exclusive = <T>(
+  operation: (transaction?: LibraryTransaction) => T,
+) => Promise<T>;
 export const withLibraryLock: Exclusive = (operation) =>
   new Promise((resolve, reject) => {
     const request = indexedDB.open("blackroom-map-locks", 1);
@@ -24,9 +31,16 @@ export const withLibraryLock: Exclusive = (operation) =>
       const tx = db.transaction("mutations", "readwrite");
       let result: ReturnType<typeof operation>;
       let failure: unknown;
-      tx.objectStore("mutations").get("library").onsuccess = () => {
+      const store = tx.objectStore("mutations");
+      const read = store.get("library");
+      read.onsuccess = () => {
         try {
-          result = operation();
+          result = operation({
+            latest: read.result,
+            publish: (raw) => {
+              store.put(raw, "library");
+            },
+          });
         } catch (error) {
           failure = error;
           tx.abort();
