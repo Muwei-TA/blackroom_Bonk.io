@@ -128,3 +128,62 @@ it("closes live connections and releases listening port", async () => {
   await second.listen(f.port, "127.0.0.1");
   await second.close();
 });
+
+it("syncs custom maps to members and later joins, enforces owner/state/rate and isolates rooms", async () => {
+  const { toDocument } = await import("../../src/shared/custom-map");
+  const { MAPS } = await import("../../src/shared/maps");
+  const f = await fixture(),
+    a = await client(f.port),
+    b = await client(f.port),
+    c = await client(f.port),
+    d = await client(f.port);
+  a.send({ type: "create", nickname: "Owner" });
+  const code = (await a.wait("room")).room.code;
+  b.send({ type: "join", nickname: "Guest", code });
+  await b.wait("room");
+  d.send({ type: "create", nickname: "Other" });
+  await d.wait("room");
+  const document = toDocument(MAPS[0]);
+  document.map.name = "朋友的地图";
+  b.send({ type: "applyCustomMap", document });
+  expect((await b.wait("error")).code).toBe("HOST_ONLY");
+  a.ws.send(
+    " ".repeat(5000) + JSON.stringify({ type: "applyCustomMap", document }),
+  );
+  await a.wait("mapApplied");
+  const changed = (
+    await b.wait("room", (m) => m.room.map?.name === document.map.name)
+  ).room;
+  expect(changed.map.platforms).toEqual(document.map.platforms);
+  c.send({ type: "join", nickname: "Later", code });
+  expect((await c.wait("room")).room.map).toEqual(changed.map);
+  expect(
+    d.inbox.some(
+      (m) => m.type === "room" && m.room.map.name === document.map.name,
+    ),
+  ).toBe(false);
+  a.send({ type: "applyCustomMap", document });
+  expect((await a.wait("error")).code).toBe("MAP_RATE_LIMIT");
+  a.send({ type: "start" });
+  await a.wait("snapshot", (m) => m.world.phase === "playing");
+  a.send({ type: "applyCustomMap", document });
+  expect((await a.wait("error")).code).toBe("IN_PROGRESS");
+});
+it("invalid maps do not replace existing map and oversized frames close", async () => {
+  const { toDocument } = await import("../../src/shared/custom-map");
+  const { MAPS } = await import("../../src/shared/maps");
+  const f = await fixture(),
+    a = await client(f.port),
+    b = await client(f.port);
+  a.send({ type: "create", nickname: "A" });
+  const code = (await a.wait("room")).room.code;
+  const document = toDocument(MAPS[0]);
+  document.map.spawns[0] = { x: 600, y: 560 };
+  a.send({ type: "applyCustomMap", document });
+  expect((await a.wait("error")).message).toContain("出生点");
+  b.send({ type: "join", nickname: "B", code });
+  expect((await b.wait("room")).room.map.id).toBe("origin");
+  const closed = new Promise<number>((r) => a.ws.once("close", r));
+  a.ws.send(" ".repeat(32769));
+  expect(await closed).toBe(1009);
+});

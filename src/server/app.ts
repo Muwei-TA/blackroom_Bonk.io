@@ -64,7 +64,7 @@ export function createGameServer(options: { staticDir?: string } = {}) {
   });
   const wss = new WebSocketServer({
     noServer: true,
-    maxPayload: 4096,
+    maxPayload: 32768,
     perMessageDeflate: false,
   });
   const peers = new Map<string, WebSocket>();
@@ -101,14 +101,39 @@ export function createGameServer(options: { staticDir?: string } = {}) {
         ws.close(1008, "Message rate exceeded");
         return;
       }
+      const rawData = Array.isArray(data)
+        ? Buffer.concat(data)
+        : Buffer.isBuffer(data)
+          ? data
+          : Buffer.from(data);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawData.toString());
+      } catch {
+        if (rawData.length > 4096) {
+          ws.close(1009, "Message too large");
+          return;
+        }
+      }
+      const custom =
+        !!parsed &&
+        typeof parsed === "object" &&
+        (parsed as { type?: string }).type === "applyCustomMap";
+      if (!custom && rawData.length > 4096) {
+        ws.close(1009, "Message too large");
+        return;
+      }
       try {
         if (binary) throw new Error("binary");
-        rooms.handle(id, parseClientMessage(JSON.parse(data.toString())));
-      } catch {
+        rooms.handle(id, parseClientMessage(parsed));
+      } catch (e) {
         sendBounded(ws, {
           type: "error",
           code: "INVALID_MESSAGE",
-          message: "消息格式无效，请检查昵称、房间码或刷新页面",
+          message:
+            custom && e instanceof Error
+              ? e.message
+              : "消息格式无效，请检查昵称、房间码或刷新页面",
         });
       }
     });

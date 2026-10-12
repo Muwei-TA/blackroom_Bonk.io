@@ -1,11 +1,7 @@
 import Matter from "matter-js";
-import { PHYSICS, RADIUS, STEP_MS } from "../shared/constants";
-import type { MapDefinition } from "../shared/maps";
-import {
-  neutralInput,
-  type InputState,
-  type BodyView,
-} from "../shared/protocol";
+import { PHYSICS, RADIUS, STEP_MS } from "./constants";
+import type { MapDefinition } from "./maps";
+import { neutralInput, type InputState, type BodyView } from "./protocol";
 const { Engine, Bodies, Body, Composite } = Matter;
 type Ball = {
   body: Matter.Body;

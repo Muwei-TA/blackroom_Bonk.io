@@ -11,7 +11,7 @@ import {
   type RoomPhase,
   type WorldSnapshot,
 } from "../shared/protocol";
-import { PhysicsWorld } from "./physics";
+import { PhysicsWorld } from "../shared/physics";
 export class Match {
   phase: RoomPhase = "lobby";
   round = 0;

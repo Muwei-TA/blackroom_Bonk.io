@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import Matter from "matter-js";
-import { PhysicsWorld } from "../../src/server/physics";
+import { PhysicsWorld } from "../../src/shared/physics";
 import { MAPS, getMap } from "../../src/shared/maps";
 import { neutralInput } from "../../src/shared/protocol";
 const body = (w: PhysicsWorld, id: string) =>

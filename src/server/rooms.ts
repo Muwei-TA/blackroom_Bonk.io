@@ -1,6 +1,7 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { COLORS, MAX_PLAYERS, MAX_ROOMS } from "../shared/constants";
-import { getMap } from "../shared/maps";
+import { getMap, type MapDefinition } from "../shared/maps";
+import { toDefinition } from "../shared/custom-map";
 import type {
   ClientMessage,
   ServerMessage,
@@ -11,7 +12,7 @@ import { Match } from "./match";
 type Room = {
   code: string;
   hostId: string;
-  mapId: string;
+  map: MapDefinition;
   players: Map<string, PlayerView>;
   match: Match | null;
   notice: string;
@@ -27,6 +28,7 @@ export class RoomManager {
   private rooms = new Map<string, Room>();
   private members = new Map<string, string>();
   private connected = new Set<string>();
+  private lastMapSubmission = new Map<string, number>();
   constructor(
     private send: (id: string, m: ServerMessage) => void,
     private now: () => number = () => performance.now(),
@@ -43,7 +45,8 @@ export class RoomManager {
     return {
       code: r.code,
       hostId: r.hostId,
-      mapId: r.mapId,
+      mapId: r.map.id,
+      map: structuredClone(r.map),
       phase: r.match?.phase ?? "lobby",
       round: r.match?.round ?? 0,
       players: [...r.players.values()].map((p) => ({
@@ -80,7 +83,7 @@ export class RoomManager {
         r = {
           code: c,
           hostId: id,
-          mapId: "origin",
+          map: structuredClone(getMap("origin")),
           players: new Map(),
           match: null,
           notice: "邀请朋友加入，至少两人即可开始",
@@ -115,6 +118,23 @@ export class RoomManager {
     }
     if (r.hostId !== id) return this.error(id, "HOST_ONLY", "只有房主可以操作");
     const phase = r.match?.phase ?? "lobby";
+    if (m.type === "applyCustomMap") {
+      if (phase !== "lobby")
+        return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
+      const now = this.now();
+      if (now - (this.lastMapSubmission.get(id) ?? -Infinity) < 1000)
+        return this.error(id, "MAP_RATE_LIMIT", "地图提交过于频繁，请稍后重试");
+      this.lastMapSubmission.set(id, now);
+      try {
+        r.map = toDefinition(m.document, "custom-" + randomUUID());
+      } catch (e) {
+        return this.error(id, "INVALID_MAP", (e as Error).message);
+      }
+      r.notice = "房主已加载自定义地图：" + r.map.name;
+      this.broadcast(r);
+      this.send(id, { type: "mapApplied" });
+      return;
+    }
     if (m.type === "selectMap") {
       if (phase !== "lobby")
         return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
@@ -123,7 +143,7 @@ export class RoomManager {
       } catch {
         return this.error(id, "INVALID_MAP", "地图不存在");
       }
-      r.mapId = m.mapId;
+      r.map = structuredClone(getMap(m.mapId));
       this.broadcast(r);
       return;
     }
@@ -132,7 +152,7 @@ export class RoomManager {
       if (r.players.size < 2)
         return this.error(id, "NEED_PLAYERS", "至少需要两位玩家");
       r.match?.dispose();
-      r.match = new Match(getMap(r.mapId), [...r.players.keys()]);
+      r.match = new Match(r.map, [...r.players.keys()]);
       r.match.tick(this.now());
       r.match.start();
       r.notice = "准备出发！";
@@ -169,6 +189,7 @@ export class RoomManager {
   disconnect(id: string) {
     this.leave(id);
     this.connected.delete(id);
+    this.lastMapSubmission.delete(id);
   }
   tick(nowMs: number) {
     for (const r of this.rooms.values()) {
@@ -201,5 +222,6 @@ export class RoomManager {
     this.rooms.clear();
     this.members.clear();
     this.connected.clear();
+    this.lastMapSubmission.clear();
   }
 }

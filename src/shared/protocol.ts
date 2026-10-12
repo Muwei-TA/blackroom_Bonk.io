@@ -1,3 +1,5 @@
+import type { MapDefinition } from "./maps";
+import { validateDocument, type MapDocument } from "./custom-map";
 export type InputState = {
   left: boolean;
   right: boolean;
@@ -30,6 +32,7 @@ export type RoomView = {
   code: string;
   hostId: string;
   mapId: string;
+  map: MapDefinition;
   phase: RoomPhase;
   round: number;
   players: PlayerView[];
@@ -48,6 +51,7 @@ export type ClientMessage =
   | { type: "create"; nickname: string }
   | { type: "join"; nickname: string; code: string }
   | { type: "selectMap"; mapId: string }
+  | { type: "applyCustomMap"; document: MapDocument }
   | { type: "start" | "rematch" | "leave" }
   | { type: "input"; seq: number; state: InputState };
 export type ServerMessage =
@@ -55,6 +59,7 @@ export type ServerMessage =
   | { type: "room"; room: RoomView }
   | { type: "snapshot"; world: WorldSnapshot }
   | { type: "left" }
+  | { type: "mapApplied" }
   | { type: "error"; code: string; message: string };
 export class ProtocolError extends Error {}
 const invalid = (): never => {
@@ -90,6 +95,9 @@ export function parseClientMessage(value: unknown): ClientMessage {
       if (!/^[A-Z2-9]{6}$/.test(code)) return invalid();
       return { type: "join", nickname: nickname(v.nickname), code };
     }
+    case "applyCustomMap":
+      exact(v, ["type", "document"]);
+      return { type: "applyCustomMap", document: validateDocument(v.document) };
     case "selectMap":
       exact(v, ["type", "mapId"]);
       if (typeof v.mapId !== "string" || v.mapId.length > 32) return invalid();
