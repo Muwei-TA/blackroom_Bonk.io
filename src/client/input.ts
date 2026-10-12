@@ -2,6 +2,7 @@ import { type InputState } from "../shared/protocol";
 export function bindInput(
   target: Window,
   onInput: (s: InputState) => void,
+  enabled: () => boolean = () => true,
 ): () => void {
   const keys = new Set<string>();
   const allowed = [
@@ -21,6 +22,7 @@ export function bindInput(
       heavy: keys.has("Space"),
     });
   const down = (e: KeyboardEvent) => {
+    if (!enabled()) return;
     if (
       (e.target as HTMLElement)?.closest?.(
         'input,textarea,select,[contenteditable="true"]',

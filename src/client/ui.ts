@@ -1,5 +1,5 @@
 import { MAPS, getMap } from "../shared/maps";
-import { COLORS } from "../shared/constants";
+import { openWorkshop } from "./editor/workshop";
 import type {
   ClientMessage,
   ServerMessage,
@@ -11,7 +11,7 @@ import { SnapshotBuffer } from "./interpolation";
 import { renderFrame, drawMapPreview } from "./renderer";
 export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   root.innerHTML = `
- <header class="topbar"><a class="brand" href="/" aria-label="黑房弹球首页"><span class="brand-mark">b<span>•</span></span><span>BLACKROOM<small>黑房弹球</small></span></a><div class="top-links"><span class="edition">物理碰撞 · 朋友对战</span><span id="connection" class="connection">连接中</span></div></header>
+ <header class="topbar"><a class="brand" href="/" aria-label="黑房弹球首页"><span class="brand-mark">b<span>•</span></span><span>BLACKROOM<small>黑房弹球</small></span></a><div class="top-links"><button id="open-workshop" class="workshop-link">地图工坊</button><span class="edition">物理碰撞 · 朋友对战</span><span id="connection" class="connection">连接中</span></div></header>
  <main>
  <section id="home" class="home">
  <div class="hero"><div class="eyebrow"><span></span> GOOD FRIENDS. GREAT COLLISIONS.</div><h1>把快乐，<br><em>撞出来。</em></h1><p class="hero-copy">小小的球，大大的胜负欲。<br>叫上朋友，留在场上，成为最后的赢家。</p>
@@ -31,6 +31,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
  <aside class="room-sidebar"><div class="room-code-box"><span class="small-label">你的专属房间</span><div class="code-line"><strong id="room-code" data-testid="room-code"></strong><button id="copy" class="icon-button" aria-label="复制房间码">⧉</button></div><p class="muted">把房间码发给朋友，一起入场</p></div>
  <div class="roster-heading"><h3>场上好友</h3><span id="player-count">1 / 8</span></div><ul id="players" data-testid="players"></ul>
  <div class="map-heading"><h3>选择竞技场</h3><span>房主设置</span></div><div id="map-options" class="map-options"></div>
+ <button id="custom-map" class="button secondary custom-map-button">自定义地图</button>
  <button id="start" class="button primary">开始比赛</button><button id="rematch" class="button primary" hidden>返回准备页</button><p id="start-hint" class="field-hint">至少 2 人即可开始</p><button id="leave" class="leave-button">离开房间</button></aside>
  </section>
  <section class="howto"><div class="howto-title"><span class="small-label">HOW TO BONK</span><h3>三步上手，碰个痛快。</h3></div><div class="control-item"><div class="keys"><kbd>A</kbd><kbd>D</kbd><span>/</span><kbd>←</kbd><kbd>→</kbd></div><b>左右移动</b><p>找准位置，蓄势出击</p></div><div class="control-item"><div class="keys"><kbd>W</kbd><span>/</span><kbd>↑</kbd></div><b>跳跃</b><p>落地后再次起跳</p></div><div class="control-item"><div class="keys"><kbd class="space-key">SPACE</kbd></div><b>加重防御</b><p>按住变重，稳住别掉</p></div></section>
@@ -46,6 +47,23 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     raf = 0,
     errorTimer: ReturnType<typeof setTimeout> | undefined;
   const buffer = new SnapshotBuffer();
+  let workshop: ReturnType<typeof openWorkshop> | null = null;
+  const launchWorkshop = () => {
+    if (workshop) return;
+    window.dispatchEvent(new Event("blur"));
+    workshop = openWorkshop(root, {
+      initial: room?.map ?? MAPS[0],
+      canApply: () =>
+        connected && room?.hostId === selfId && room?.phase === "lobby",
+      apply: (document) => send({ type: "applyCustomMap", document }),
+      close: () => {
+        workshop = null;
+        if (!connected) el("disconnected").hidden = false;
+      },
+    });
+  };
+  el("open-workshop").onclick = launchWorkshop;
+  el("custom-map").onclick = launchWorkshop;
   const error = (message: string) => {
     el("error").textContent = message;
     el("error").hidden = false;
@@ -107,7 +125,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     if (!room) return;
     el("error").hidden = true;
     el("room-code").textContent = room.code;
-    el("map-name").textContent = getMap(room.mapId).name;
+    el("map-name").textContent = room.map.name;
     el("player-count").textContent = `${room.players.length} / 8`;
     el("notice").textContent = room.notice;
     el("round-label").textContent =
@@ -148,6 +166,8 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
     }
     const host = room.hostId === selfId,
       lobby = room.phase === "lobby";
+    el<HTMLButtonElement>("custom-map").disabled =
+      !connected || !host || !lobby;
     el<HTMLButtonElement>("start").disabled =
       !connected || !host || !lobby || room.players.length < 2;
     el("start").hidden = room.phase === "matchOver";
@@ -175,7 +195,7 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
   }
   function frame() {
     if (room) {
-      const map = getMap(room.mapId);
+      const map = room.map;
       const bodies: BodyView[] =
         room.phase === "lobby"
           ? room.players.map((p, i) => ({
@@ -245,14 +265,18 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
         el("connection").classList.add("online");
         el<HTMLButtonElement>("create").disabled = false;
         el<HTMLButtonElement>("join").disabled = false;
-      } else if (m.type === "error") error(m.message);
-      else if (m.type === "room") {
-        if (room?.code !== m.room.code) {
+      } else if (m.type === "mapApplied") workshop?.applied();
+      else if (m.type === "error") {
+        error(m.message);
+        workshop?.failed(m.message);
+      } else if (m.type === "room") {
+        if (room?.code !== m.room.code || room?.map.id !== m.room.map.id) {
           buffer.clear();
           world = null;
         }
         room = m.room;
         renderRoom();
+        workshop?.refresh();
       } else if (m.type === "left") {
         room = null;
         world = null;
@@ -269,16 +293,26 @@ export function mountUi(root: HTMLElement, send: (m: ClientMessage) => void) {
       connected = false;
       el("connection").textContent = "已断开";
       el("connection").classList.remove("online");
-      el("disconnected").hidden = false;
+      el("disconnected").hidden = !!workshop;
       for (const b of root.querySelectorAll<HTMLButtonElement>("button"))
-        if (b.id !== "reconnect") b.disabled = true;
+        if (
+          b.id !== "reconnect" &&
+          !b.closest(".workshop") &&
+          b.id !== "open-workshop"
+        )
+          b.disabled = true;
+      workshop?.failed("连接已断开，你仍可保存或导出本地作品。");
     },
     dispose() {
+      workshop?.dispose();
       cancelAnimationFrame(raf);
       clearTimeout(errorTimer);
     },
+    isEditing() {
+      return !!workshop;
+    },
     isPlaying() {
-      return room?.phase === "playing";
+      return !workshop && room?.phase === "playing";
     },
   };
 }

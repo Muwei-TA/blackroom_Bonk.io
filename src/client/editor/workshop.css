@@ -1,0 +1,347 @@
+.workshop-link {
+  border: 1px solid #4f6448;
+  background: #263329;
+  color: #d5edb1;
+  border-radius: 8px;
+  padding: 8px 15px;
+  font-size: 12px;
+}
+.custom-map-button {
+  width: 100%;
+  margin-top: 12px;
+}
+.workshop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: #11181b;
+  color: #edf2e5;
+  overflow: auto;
+  padding: 25px 3vw 20px;
+}
+.workshop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 20px;
+}
+.workshop-header h1 {
+  font-size: 28px;
+  letter-spacing: -1px;
+  margin: 10px 0 0;
+}
+.workshop-header .small-label {
+  color: #afc493;
+}
+.workshop button {
+  background: #26322f;
+  color: #e2ebd6;
+  border: 1px solid #48564a;
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 11px;
+}
+.workshop button:hover:not(:disabled) {
+  background: #354738;
+  border-color: #829966;
+}
+.workshop .accent-tool {
+  background: #ccff62;
+  color: #24321c;
+  border-color: #ccff62;
+}
+.workshop .accent-tool:hover:not(:disabled) {
+  background: #dfff96;
+}
+.workshop-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid #35413b;
+  border-bottom: 1px solid #35413b;
+  padding: 13px 0;
+  margin-bottom: 24px;
+}
+.tool-group,
+.tool-pair {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.workshop-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 220px;
+  gap: 22px;
+}
+.workshop-tools,
+.workshop-properties {
+  background: #1a2527;
+  border: 1px solid #35413c;
+  border-radius: 12px;
+  padding: 18px 15px;
+}
+.workshop-tools > .button {
+  width: 100%;
+  margin: 17px 0 10px;
+  height: 42px;
+}
+.tool-pair button {
+  font-size: 10px;
+  padding: 8px;
+  flex: 1;
+}
+.workshop label {
+  margin-top: 18px;
+  font-size: 11px;
+}
+.workshop input {
+  font-size: 12px;
+  padding: 0 10px;
+  height: 37px;
+  border-color: #40504b;
+  background: #121c21;
+}
+.workshop select {
+  background: #121c21;
+  color: #d6e2d0;
+  border: 1px solid #40504b;
+  border-radius: 6px;
+  width: 100%;
+  padding: 9px 6px;
+  font: 11px inherit;
+  max-width: 100%;
+}
+.workshop .check-label {
+  justify-content: flex-start;
+  align-items: center;
+  font-size: 10px;
+  gap: 7px;
+}
+.check-label input {
+  width: 14px;
+  height: 14px;
+  accent-color: #ccff62;
+}
+.workshop .text-tool {
+  padding: 9px 0;
+  background: none;
+  border: 0;
+  color: #9aaa98;
+  font-size: 10px;
+}
+.library-section {
+  border-top: 1px solid #35433c;
+  margin-top: 22px;
+}
+.library-section p {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #adbb9e;
+}
+.library-section button {
+  margin-top: 5px;
+}
+.studio-hint {
+  color: #8b9e96;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.studio-legend {
+  border-top: 1px solid #35433c;
+  margin-top: 24px;
+  padding-top: 18px;
+  font-size: 11px;
+}
+.studio-legend p {
+  font-size: 10px;
+  line-height: 2;
+  color: #8d9f94;
+}
+.canvas-heading,
+.canvas-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+  color: #9bb18e;
+  padding: 9px 1px;
+}
+.canvas-heading {
+  padding-top: 0;
+  height: 25px;
+}
+.canvas-footer {
+  font-size: 9px;
+  line-height: 1.7;
+}
+.workshop canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3/2;
+  touch-action: none;
+  border: 1px solid #50604d;
+  border-radius: 7px;
+}
+.workshop canvas:focus-visible {
+  outline: 1px solid #ccff62;
+  outline-offset: 3px;
+}
+.validation {
+  font-size: 11px;
+  padding: 13px 15px;
+  border: 1px solid #415347;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.validation.valid {
+  background: #243628;
+  color: #c4e3a1;
+}
+.validation.invalid {
+  background: #382e27;
+  color: #ffcda5;
+  border-color: #6f5140;
+}
+.trial-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.trial-tools .button {
+  height: 37px;
+}
+.trial-tools span {
+  font-size: 10px;
+  color: #aabb98;
+}
+.workshop-properties .property-divider {
+  border-top: 1px solid #35433c;
+  margin: 24px 0 18px;
+}
+.workshop-properties h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.property-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.workshop-properties label:has(input[data-property]) {
+  display: block;
+}
+.workshop-properties input[data-property] {
+  margin-top: 9px;
+  min-width: 0;
+  width: 100%;
+}
+.spawn-key {
+  font-size: 11px;
+  background: #202f2c;
+  border-radius: 8px;
+  padding: 13px;
+  margin-top: 28px;
+}
+.spawn-key p {
+  font-size: 10px;
+  line-height: 1.9;
+  color: #93a58d;
+}
+.workshop-message {
+  font-size: 12px;
+  min-height: 20px;
+  color: #d3eab1;
+  margin: 18px 0 0;
+}
+.workshop dialog {
+  background: #1d2b2a;
+  color: #eaf4da;
+  border: 1px solid #58704e;
+  border-radius: 14px;
+  padding: 28px;
+  max-width: 460px;
+}
+.workshop dialog::backdrop {
+  background: #081015c9;
+  backdrop-filter: blur(4px);
+}
+.workshop dialog h2 {
+  font-size: 21px;
+  margin-top: 0;
+}
+.workshop dialog p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #bbcdb0;
+}
+.workshop dialog > div {
+  display: flex;
+  gap: 9px;
+  margin-top: 22px;
+}
+.workshop [disabled] {
+  opacity: 0.4;
+}
+@media (min-width: 1600px) {
+  .workshop {
+    padding-left: 5vw;
+    padding-right: 5vw;
+  }
+  .workshop-layout {
+    grid-template-columns: 200px minmax(0, 1fr) 245px;
+    gap: 28px;
+  }
+}
+@media (max-width: 1050px) {
+  .workshop-layout {
+    grid-template-columns: 150px minmax(0, 1fr) 180px;
+    gap: 12px;
+  }
+  .workshop {
+    padding: 20px;
+  }
+  .workshop-tools,
+  .workshop-properties {
+    padding: 13px 10px;
+  }
+  .workshop-header h1 {
+    font-size: 24px;
+  }
+  .workshop-toolbar .tool-group {
+    gap: 5px;
+  }
+}
+@media (max-width: 760px) {
+  .workshop-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+  .workshop-center {
+    grid-column: 1/-1;
+    grid-row: 1;
+  }
+  .workshop-header h1 {
+    font-size: 20px;
+  }
+  .workshop-toolbar {
+    gap: 9px;
+  }
+  .workshop {
+    padding: 16px;
+  }
+  .top-links {
+    gap: 10px;
+  }
+  .top-links .edition {
+    display: none;
+  }
+  .workshop-header {
+    align-items: flex-start;
+  }
+  .studio-legend {
+    display: none;
+  }
+}

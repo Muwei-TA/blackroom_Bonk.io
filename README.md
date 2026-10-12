@@ -116,14 +116,14 @@ docs/        已确认的设计与实施计划
 
 ### 受代理限制的构建环境
 
-普通服务器直接使用 `docker compose up --build -d`。本次云环境的容器网络无法直接解析 npm 域名，需要用宿主网络及平台已有代理构建；不要把这些环境专用选项硬编码进通用 Compose 配置。Dockerfile 支持可选的 `npm_ca` BuildKit secret，用于企业/云代理的 CA 信任，证书不会进入最终镜像。
+普通服务器直接使用 `docker compose up --build -d`。本次云环境的容器构建网络缺少代理主机解析，需要使用平台已有代理和主机解析构建；不要把这些环境专用选项硬编码进通用 Compose 配置。Dockerfile 支持可选的 `npm_ca` BuildKit secret，用于企业/云代理的 CA 信任，证书不会进入最终镜像。
 
 ```bash
 # 仅当当前环境已经配置这些代理变量和 CA 路径时使用
 # 若 ~/.docker 不可写，先把 DOCKER_CONFIG 设置到可写目录
 proxy_address=$(getent ahostsv4 proxy | awk 'NR==1 {print $1}')
 DOCKER_CONFIG=/workspace/tools/docker-config docker build \
-  --network host --add-host "proxy:$proxy_address" \
+  --add-host "proxy:$proxy_address" \
   --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY \
   --secret "id=npm_ca,src=$NODE_EXTRA_CA_CERTS" \
   -t blackroom-onboarding-game .
@@ -136,3 +136,19 @@ DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
 ## 本次交付验证
 
 37 项自动测试、2 项浏览器测试及 Docker 运行验收通过。具体执行记录、环境说明和已知小问题见 [交付验证](docs/validation/2026-10-12-readiness.md)。
+
+## 可视化地图工坊
+
+首页点击 **地图工坊**，或由房主在准备页点击 **自定义地图**。
+
+1. 从默认场地开始，或复制三张内置地图之一。
+2. 点击 **新增平台**；在网格画布拖动平台和编号出生点。选中平台后拖动右下角手柄缩放，右侧面板可输入精确位置、宽高和旋转角度。
+3. 网格吸附默认 10 单位，可关闭；方向键微调，Shift + 方向键移动 10 单位，Delete 删除平台，Ctrl/⌘ + Z 撤销、Ctrl/⌘ + Shift + Z 重做。撤销记录最多 50 步，一次拖动算一步。出生点固定八个，不能删除。
+4. 点击 **试跑**，从出生点 1 控制圆球；使用 A/D、W 和空格，随时重置或返回编辑。几何校验不保证地图公平或每个出生点都有落脚处，请检查其他出生点并和朋友试玩。
+5. **保存地图**存入当前浏览器，**另存为**创建独立副本；地图库最多 20 张，支持加载和确认删除。修改未保存就离开会提示保留或放弃。
+6. **导出地图**下载 JSON，发给朋友后可在工坊导入。导入创建新副本，不覆盖同名地图。地图库损坏时可备份原始内容再显式重置；存储空间不足时保留编辑草稿并提示导出。
+7. 房主在准备阶段点击 **应用到房间**，收到同步成功提示后返回房间开局。所有成员和后来加入者会收到同一份地图；访客及比赛中不能修改地图。
+
+地图最多 64 个矩形平台，支持旋转形成斜坡；八个出生点不能重叠或嵌入平台。编辑区域固定为 1200 × 800，平台不能超出编辑区域。地图文件最多 32 KiB，只接受 `blackroom-map` 格式版本 1，服务器会再次校验上传地图。联机上传每连接每秒最多一次；其他消息仍限制 4 KiB。
+
+地图保存在**当前浏览器和网站地址**下，不跨设备同步；换域名、换端口、使用隐私窗口或清除浏览器数据都会影响可用地图。请导出 JSON 保留备份。断线时已打开的工坊仍可保存、导出本地作品；房间里的地图随房间销毁或服务器重启清空。

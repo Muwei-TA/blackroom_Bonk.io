@@ -10,10 +10,15 @@ const network = connect(
   (m) => ui.update(m),
   () => ui.disconnected(),
 );
-const unbind = bindInput(window, (s) => {
-  input = s;
-  if (ui.isPlaying()) network.send({ type: "input", seq: ++seq, state: input });
-});
+const unbind = bindInput(
+  window,
+  (s) => {
+    input = s;
+    if (ui.isPlaying())
+      network.send({ type: "input", seq: ++seq, state: input });
+  },
+  () => !ui.isEditing(),
+);
 const interval = setInterval(() => {
   if (ui.isPlaying()) network.send({ type: "input", seq: ++seq, state: input });
 }, 1000 / 30);

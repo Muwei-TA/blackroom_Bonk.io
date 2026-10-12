@@ -47,3 +47,19 @@ it("does not hijack nickname input and supports equivalent keys simultaneously",
   input.remove();
   stop();
 });
+it("allows the editor to own keyboard input without game shortcuts interfering", () => {
+  let called = 0;
+  const stop = bindInput(
+    window,
+    () => called++,
+    () => false,
+  );
+  const event = new KeyboardEvent("keydown", {
+    code: "ArrowLeft",
+    cancelable: true,
+  });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);
+  expect(called).toBe(0);
+  stop();
+});
