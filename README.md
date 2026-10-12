@@ -1,0 +1,133 @@
+# 黑房弹球 · BLACKROOM
+
+和朋友一起玩的浏览器物理竞技游戏，灵感来自 Bonk.io。原创中文界面、圆球角色和三张地图；服务端统一计算碰撞与比分，2–8 人通过房间码联机。
+
+## Docker 部署
+
+需要 Docker Engine 和 Docker Compose 插件。
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+浏览器访问部署服务器的 3000 端口。创建房间，把六位房间码发给朋友。要远程联机，朋友须能访问同一服务器地址，并放行该端口。
+
+```bash
+# 修改宿主机端口，例如 8080；容器内仍为 3000
+PORT=8080 docker compose up --build -d
+# 查看日志与关闭服务
+docker compose logs -f game
+docker compose down
+```
+
+也可以复制 `.env.example` 为 `.env` 设置 Compose 端口。Compose 配有健康检查、非 root 运行、信号处理和自动重启。公网使用 HTTPS 反向代理，同时转发 `/ws` 的 WebSocket Upgrade；页面会自动选择 WSS。应用没有用户账号或跨实例房间同步，应部署为单实例。
+
+## 本地开发
+
+使用 Node.js **22**（`.nvmrc`）。安装时保留并使用锁文件。
+
+```bash
+nvm use
+npm ci
+npm run dev
+```
+
+Vite 使用 5173 端口，后端使用 3000；Vite 自动代理 `/ws` 和 `/healthz`。开发命令已绑定 `0.0.0.0`。浏览器访问 Vite 的地址。
+
+生产方式运行：
+
+```bash
+npm run build
+npm start
+```
+
+生产进程同源提供 HTML、构建资源、WebSocket 和健康检查。直接启动 Node.js 时，可用 `PORT=8080 npm start` 修改服务端口。直接启动不自动读取 `.env`。
+
+## 怎么玩
+
+1. 输入 1–20 个字符的昵称，创建房间，或输入朋友的房间码加入。
+2. 房主选择「起点站」「浮空阶梯」或「折线山谷」。至少两人时开始。
+3. 三秒倒计时后开场，把对手撞出场地；最后存活者得一分，先得五分者赢得比赛。
+
+| 按键           | 操作                                 |
+| -------------- | ------------------------------------ |
+| A / D 或 ← / → | 左右移动                             |
+| W 或 ↑         | 跳跃；接触地面后才能再跳，需重新按下 |
+| 按住空格       | 加重防御，质量增加但加速变慢         |
+
+- 每轮最多 90 秒；同时全灭或超时仍有多人存活为平局，无人得分。
+- 淘汰后继续观战；回合结算三秒后自动开始下一轮。
+- 房间最多八人，比赛期间不能加入。昵称可重复，颜色和玩家身份用于区分。
+- 玩家离开即退出当前比赛；房主离开会把权限移交给最早加入的在线成员。
+- 少于两人时取消比赛、清空比分并返回准备页。比赛结束后房主可返回准备页重开。
+- 页面失焦清空按键；服务器也会清除超过一秒没有更新的输入。
+- 断线不恢复原身份；重新连接后可加入等待中的房间。
+- 只支持电脑键盘操作，手机可查看页面但没有触控游戏控制。
+
+## 验证
+
+```bash
+npm run typecheck
+npm test
+npm run build
+npm start
+# 在另一个终端验证运行中的生产服务
+npm run smoke
+```
+
+`smoke` 验证健康检查、页面与生产资源、两个真实 WebSocket 客户端的创建、加入、开场、移动和退出。其他端口可使用 `BASE_URL=http://127.0.0.1:8080 npm run smoke`。失败返回非零退出码。
+
+浏览器验收：
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+测试会自动启动开发服务，要求 3000 和 5173 端口空闲。已有 Chromium 时可设置 `BROWSER_EXECUTABLE=/usr/bin/chromium`。要检查 Docker 或其他已启动服务，设置 `BASE_URL`，例如 `BASE_URL=http://127.0.0.1:3000 npm run test:e2e`，此时测试不会启动额外服务。
+
+截图保存在 `artifacts/`，失败时的截图与追踪文件保存在 `test-results/`，都不提交到 Git。测试覆盖真实 Matter.js 模拟、回合计分、房间权限与隔离、协议校验，以及浏览器双窗口实际操作。
+
+## 项目结构
+
+```text
+src/shared/  类型协议、地图、公共参数
+src/server/  物理模拟、比赛状态、房间、HTTP/WebSocket
+src/client/  界面、输入、快照插值与 Canvas 绘制
+tests/       单元、真实 WebSocket 集成、浏览器测试
+scripts/     生产服务冒烟检查
+docs/        已确认的设计与实施计划
+```
+
+服务端以 60 Hz 固定步长模拟，20 Hz 发送快照；客户端发送按键，不能指定位置或比分。每个房间独立运行，连接受消息大小、发送频率和输出缓冲限制。房间及比分在内存中，服务重启即清空。默认最多 100 个房间，这不是经过压测的并发容量承诺。
+
+## 故障排查
+
+- **无法加入**：确认访问同一台服务器，房间码正确、尚有空位且未开赛。
+- **页面可开但连接断开**：检查反向代理的 WebSocket 转发、HTTPS/WSS 配置和服务器日志。
+- **端口被占用**：停止冲突服务或修改 Compose 宿主端口；开发代理默认指向后端 3000。
+- **依赖下载失败**：检查 npm 网络、代理和 CA 信任，不关闭 TLS 校验；可用 `npm_config_cache` 指向可写目录。
+- **容器不健康**：查看 `docker compose logs game`；健康检查为 `/healthz`，它不替代实际联机测试。
+
+## Git 开发管理
+
+开发记录按设计、计划、核心物理、联机、界面、部署和验证分阶段提交。当前开发分支为 `work`；使用 `git log --oneline` 查看记录。依赖、构建输出、环境变量文件和测试截图被忽略。发布、推送或合并需由项目维护者执行。
+
+### 受代理限制的构建环境
+
+普通服务器直接使用 `docker compose up --build -d`。本次云环境的容器网络无法直接解析 npm 域名，需要用宿主网络及平台已有代理构建；不要把这些环境专用选项硬编码进通用 Compose 配置。Dockerfile 支持可选的 `npm_ca` BuildKit secret，用于企业/云代理的 CA 信任，证书不会进入最终镜像。
+
+```bash
+# 仅当当前环境已经配置这些代理变量和 CA 路径时使用
+# 若 ~/.docker 不可写，先把 DOCKER_CONFIG 设置到可写目录
+DOCKER_CONFIG=/workspace/tools/docker-config docker build \
+  --network host \
+  --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY \
+  --secret "id=npm_ca,src=$NODE_EXTRA_CA_CERTS" \
+  -t blackroom-onboarding-game .
+DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
+  -p blackroom-onboarding up -d --no-build
+```
+
+代理参数使用 Docker 预定义构建参数，不在 Dockerfile 中声明或保存；不要将凭据写入 `.env.example`、Dockerfile 或提交记录。
