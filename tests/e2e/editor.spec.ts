@@ -181,7 +181,7 @@ test("library writes wait for the cross-tab transaction lock", async ({
   await other.goto("/");
   await other.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("blackroom-map-locks", 1);
+      const request = indexedDB.open("blackroom-map-locks", 2);
       request.onupgradeneeded = () =>
         request.result.createObjectStore("mutations");
       request.onsuccess = () => resolve(request.result);

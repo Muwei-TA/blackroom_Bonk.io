@@ -10,7 +10,7 @@ export type Exclusive = <T>(
 ) => Promise<T>;
 export const withLibraryLock: Exclusive = (operation) =>
   new Promise((resolve, reject) => {
-    const request = indexedDB.open("blackroom-map-locks", 1);
+    const request = indexedDB.open("blackroom-map-locks", 2);
     let settled = false;
     const fail = (error?: unknown) => {
       settled = true;
@@ -18,8 +18,10 @@ export const withLibraryLock: Exclusive = (operation) =>
         error ?? Error("无法安全访问地图库，请检查浏览器存储权限并导出备份"),
       );
     };
-    request.onupgradeneeded = () =>
-      request.result.createObjectStore("mutations");
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains("mutations"))
+        request.result.createObjectStore("mutations");
+    };
     request.onerror = () => fail();
     request.onblocked = () => fail();
     request.onsuccess = () => {
