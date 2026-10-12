@@ -135,7 +135,7 @@ DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
 
 ## 本次交付验证
 
-地图工坊版本通过 60 项自动测试、8 项浏览器测试及 Docker 运行验收，见 [地图工坊交付验证](docs/validation/2026-10-12-map-editor-readiness.md)。初始游戏的环境说明见 [初始交付验证](docs/validation/2026-10-12-readiness.md)。
+最新能量天平版本通过 74 项自动测试、11 项浏览器测试及 Docker 运行验收，见 [能量天平交付验证与实际截图](docs/validation/2026-10-12-energy-arena-readiness.md)。地图工坊初版见 [工坊验收](docs/validation/2026-10-12-map-editor-readiness.md)。初始游戏的环境说明见 [初始交付验证](docs/validation/2026-10-12-readiness.md)。
 
 ## 可视化地图工坊
 
