@@ -121,8 +121,9 @@ docs/        已确认的设计与实施计划
 ```bash
 # 仅当当前环境已经配置这些代理变量和 CA 路径时使用
 # 若 ~/.docker 不可写，先把 DOCKER_CONFIG 设置到可写目录
+proxy_address=$(getent ahostsv4 proxy | awk 'NR==1 {print $1}')
 DOCKER_CONFIG=/workspace/tools/docker-config docker build \
-  --network host \
+  --network host --add-host "proxy:$proxy_address" \
   --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY \
   --secret "id=npm_ca,src=$NODE_EXTRA_CA_CERTS" \
   -t blackroom-onboarding-game .
@@ -131,3 +132,7 @@ DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
 ```
 
 代理参数使用 Docker 预定义构建参数，不在 Dockerfile 中声明或保存；不要将凭据写入 `.env.example`、Dockerfile 或提交记录。
+
+## 本次交付验证
+
+37 项自动测试、2 项浏览器测试及 Docker 运行验收通过。具体执行记录、环境说明和已知小问题见 [交付验证](docs/validation/2026-10-12-readiness.md)。

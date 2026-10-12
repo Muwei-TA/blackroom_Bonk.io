@@ -115,3 +115,38 @@ it("leaving a three player active match transfers host without abort", () => {
   expect(s.view("b")).toMatchObject({ hostId: "b", phase: "playing" });
   s.r.dispose();
 });
+
+it("host can leave round settlement and match over; new host can rematch", () => {
+  for (const target of ["roundOver", "matchOver"]) {
+    const s = setup();
+    for (const id of ["a", "b", "c"]) s.connect(id);
+    s.r.handle("a", { type: "create", nickname: "A" });
+    const code = s.view("a").code;
+    for (const id of ["b", "c"])
+      s.r.handle(id, { type: "join", nickname: id, code });
+    s.r.handle("a", { type: "start" });
+    let seq = 0;
+    for (let t = 17; t < 90000; t += 17) {
+      if (s.view("a").phase === "playing") {
+        for (const id of ["b", "c"])
+          s.r.handle(id, {
+            type: "input",
+            seq: ++seq,
+            state: { left: false, right: true, jump: false, heavy: false },
+          });
+      }
+      s.time(t);
+      if (s.view("a").phase === target) break;
+    }
+    expect(s.view("a").phase).toBe(target);
+    s.r.disconnect("a");
+    expect(s.view("b").hostId).toBe("b");
+    expect(s.view("b").players).toHaveLength(2);
+    if (target === "matchOver") {
+      s.r.handle("b", { type: "rematch" });
+      expect(s.view("b").phase).toBe("lobby");
+      expect(s.view("b").players.every((p) => p.score === 0)).toBe(true);
+    }
+    s.r.dispose();
+  }
+});
