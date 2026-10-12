@@ -1,3 +1,4 @@
+import { withLibraryLock, type Exclusive } from "./storage-lock";
 import { validateDocument, type MapDocument } from "../../shared/custom-map";
 export const LIBRARY_KEY = "blackroom.maps.v1";
 export type MapEntry = {
@@ -13,7 +14,10 @@ const createId = () =>
     n.toString(16).padStart(2, "0"),
   ).join("");
 export class MapLibrary {
-  constructor(private storage: Store) {}
+  constructor(
+    private storage: Store,
+    private exclusive: Exclusive = withLibraryLock,
+  ) {}
   raw() {
     try {
       return this.storage.getItem(LIBRARY_KEY) ?? "";
@@ -79,7 +83,10 @@ export class MapLibrary {
       throw Error("保存失败：浏览器存储不可用或空间不足，请导出备份");
     }
   }
-  save(document: MapDocument, previous?: MapEntry): MapEntry {
+  save(document: MapDocument, previous?: MapEntry): Promise<MapEntry> {
+    return this.exclusive(() => this.saveLocked(document, previous));
+  }
+  private saveLocked(document: MapDocument, previous?: MapEntry): MapEntry {
     const d = validateDocument(document),
       state = this.read();
     if (state.corrupt) throw Error("地图库损坏，请先备份并显式重置");
@@ -102,6 +109,9 @@ export class MapLibrary {
     return entry;
   }
   remove(entry: MapEntry) {
+    return this.exclusive(() => this.removeLocked(entry));
+  }
+  private removeLocked(entry: MapEntry) {
     const state = this.read();
     if (state.corrupt) throw Error("地图库损坏，请先备份");
     const latest = state.entries.find((e) => e.id === entry.id);
@@ -112,6 +122,6 @@ export class MapLibrary {
     );
   }
   reset() {
-    this.write([]);
+    return this.exclusive(() => this.write([]));
   }
 }

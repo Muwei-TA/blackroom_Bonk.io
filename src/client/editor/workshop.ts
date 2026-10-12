@@ -42,21 +42,22 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
   let entry: MapEntry | undefined,
     entries: MapEntry[] = [],
     pendingAction: (() => void) | null = null,
-    confirmAction: (() => void) | null = null;
+    confirmAction: (() => void | Promise<void>) | null = null;
   let trial: PhysicsWorld | null = null,
     input = neutralInput(),
     accumulator = 0,
     last = performance.now(),
     raf = 0,
     disposed = false,
+    busy = false,
     pendingApply = false;
   let removeCanvas: () => void = () => {},
     applyTimeout: ReturnType<typeof setTimeout> | undefined;
   const canvas = el<HTMLCanvasElement>("editor-canvas");
   const notify = (text: string) => (el("workshop-message").textContent = text);
-  const guarded = (fn: () => void) => {
+  const guarded = async (fn: () => void | Promise<void>) => {
     try {
-      fn();
+      await fn();
     } catch (e) {
       notify((e as Error).message);
     }
@@ -81,9 +82,11 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
   function checked() {
     return validateDocument(model.draft);
   }
-  function save(asNew = false) {
+  async function save(asNew = false) {
+    if (busy) return false;
+    setBusy(true);
     try {
-      const stored = library.save(checked(), asNew ? undefined : entry);
+      const stored = await library.save(checked(), asNew ? undefined : entry);
       entry = stored;
       model.draft = structuredClone(stored.document);
       model.markSaved();
@@ -94,9 +97,40 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
     } catch (e) {
       notify((e as Error).message);
       return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  function setBusy(value: boolean) {
+    busy = value;
+    container.inert = value;
+    if (value) notify("正在保存地图库…");
+    if (value) {
+      removeCanvas();
+      removeCanvas = () => {};
+    } else if (!disposed && !trial) {
+      removeCanvas = bindEditorCanvas(
+        canvas,
+        model,
+        refresh,
+        () => el<HTMLInputElement>("editor-snap").checked,
+      );
+    }
+  }
+  async function mutateLibrary(operation: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await operation();
+    } finally {
+      setBusy(false);
     }
   }
   function request(action: () => void) {
+    if (busy) {
+      notify("正在保存，请稍后重试此操作。");
+      return;
+    }
     if (trial) stopTrial();
     if (!model.dirty) {
       action();
@@ -105,7 +139,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
     pendingAction = action;
     el<HTMLDialogElement>("unsaved-dialog").showModal();
   }
-  function confirm(message: string, action: () => void) {
+  function confirm(message: string, action: () => void | Promise<void>) {
     confirmAction = action;
     el("confirm-message").textContent = message;
     el<HTMLDialogElement>("confirm-dialog").showModal();
@@ -329,26 +363,30 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       confirm(
         `删除「${selected.document.map.name}」的本地存档？当前编辑内容会保留。`,
         () =>
-          guarded(() => {
-            library.remove(selected);
-            entry = undefined;
-            refreshLibrary();
-            refresh();
-            notify("本地存档已删除，编辑内容仍在。");
-          }),
+          guarded(() =>
+            mutateLibrary(async () => {
+              await library.remove(selected);
+              entry = undefined;
+              refreshLibrary();
+              refresh();
+              notify("本地存档已删除，编辑内容仍在。");
+            }),
+          ),
       );
     },
     backup: () =>
       guarded(() => download(library.raw(), "blackroom-library-backup.json")),
     resetLibrary: () =>
       confirm("重置会清除原地图库。请先导出原始备份。", () =>
-        guarded(() => {
-          library.reset();
-          entry = undefined;
-          refreshLibrary();
-          refresh();
-          notify("地图库已重置");
-        }),
+        guarded(() =>
+          mutateLibrary(async () => {
+            await library.reset();
+            entry = undefined;
+            refreshLibrary();
+            refresh();
+            notify("地图库已重置");
+          }),
+        ),
       ),
     keepEditing: () => {
       pendingAction = null;
@@ -360,8 +398,8 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       pendingAction = null;
       action?.();
     },
-    saveAndLeave: () => {
-      if (save()) {
+    saveAndLeave: async () => {
+      if (await save()) {
         el<HTMLDialogElement>("unsaved-dialog").close();
         const action = pendingAction;
         pendingAction = null;
@@ -450,6 +488,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
   };
   const keyboard = (e: KeyboardEvent) => {
     if (
+      busy ||
       trial ||
       container.querySelector("dialog[open]") ||
       (e.target as HTMLElement).closest?.("input,select,textarea,button")

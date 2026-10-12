@@ -170,3 +170,102 @@ test("disconnected workshop still saves locally and storage errors preserve draf
   );
   await c.close();
 });
+
+test("library writes wait for the cross-tab transaction lock", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "地图工坊", exact: true }).click();
+  const other = await context.newPage();
+  await other.goto("/");
+  await other.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("blackroom-map-locks", 1);
+      request.onupgradeneeded = () =>
+        request.result.createObjectStore("mutations");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const tx = db.transaction("mutations", "readwrite");
+    (window as any).releaseMapLock = false;
+    const keepAlive = () => {
+      const request = tx.objectStore("mutations").get("library");
+      request.onsuccess = () => {
+        if (!(window as any).releaseMapLock) keepAlive();
+      };
+    };
+    keepAlive();
+    tx.oncomplete = () => db.close();
+  });
+  await page.getByRole("button", { name: "保存地图", exact: true }).click();
+  await page.waitForTimeout(200);
+  expect(
+    await page.evaluate(() => localStorage.getItem("blackroom.maps.v1")),
+  ).toBeNull();
+  await other.evaluate(() => {
+    (window as any).releaseMapLock = true;
+  });
+  await expect(page.getByTestId("save-status")).toHaveText("已保存");
+  await other.close();
+});
+
+test("simultaneous tabs preserve both maps and reject stale updates", async ({
+  page,
+  context,
+}) => {
+  const other = await context.newPage();
+  for (const [tab, name] of [
+    [page, "窗口 A"],
+    [other, "窗口 B"],
+  ] as const) {
+    await tab.goto("/");
+    await tab.getByRole("button", { name: "地图工坊", exact: true }).click();
+    await tab.getByLabel("地图名称", { exact: true }).fill(name);
+  }
+  await Promise.all(
+    [page, other].map((tab) =>
+      tab.getByRole("button", { name: "保存地图", exact: true }).click(),
+    ),
+  );
+  for (const tab of [page, other])
+    await expect(tab.getByTestId("save-status")).toHaveText("已保存");
+  const entries = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("blackroom.maps.v1")!).entries,
+  );
+  expect(entries.map((e: any) => e.document.map.name).sort()).toEqual([
+    "窗口 A",
+    "窗口 B",
+  ]);
+  const id = entries.find((e: any) => e.document.map.name === "窗口 A").id;
+  await other.locator("#editor-library").selectOption(id);
+  await expect(other.getByLabel("地图名称", { exact: true })).toHaveValue(
+    "窗口 A",
+  );
+  await page.getByLabel("地图名称", { exact: true }).fill("A 修改");
+  await other.getByLabel("地图名称", { exact: true }).fill("B 修改");
+  await Promise.all(
+    [page, other].map((tab) =>
+      tab.getByRole("button", { name: "保存地图", exact: true }).click(),
+    ),
+  );
+  await expect
+    .poll(
+      async () =>
+        (
+          await Promise.all(
+            [page, other].map((tab) =>
+              tab.locator("#workshop-message").textContent(),
+            ),
+          )
+        ).filter((s) => s?.includes("保存冲突")).length,
+    )
+    .toBe(1);
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("blackroom.maps.v1")!).entries.length,
+    ),
+  ).toBe(2);
+  await other.close();
+});

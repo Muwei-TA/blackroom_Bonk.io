@@ -135,7 +135,7 @@ DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
 
 ## 本次交付验证
 
-37 项自动测试、2 项浏览器测试及 Docker 运行验收通过。具体执行记录、环境说明和已知小问题见 [交付验证](docs/validation/2026-10-12-readiness.md)。
+地图工坊版本通过 60 项自动测试、8 项浏览器测试及 Docker 运行验收，见 [地图工坊交付验证](docs/validation/2026-10-12-map-editor-readiness.md)。初始游戏的环境说明见 [初始交付验证](docs/validation/2026-10-12-readiness.md)。
 
 ## 可视化地图工坊
 
@@ -152,3 +152,5 @@ DOCKER_CONFIG=/workspace/tools/docker-config docker compose \
 地图最多 64 个矩形平台，支持旋转形成斜坡；八个出生点不能重叠或嵌入平台。编辑区域固定为 1200 × 800，平台不能超出编辑区域。地图文件最多 32 KiB，只接受 `blackroom-map` 格式版本 1，服务器会再次校验上传地图。联机上传每连接每秒最多一次；其他消息仍限制 4 KiB。
 
 地图保存在**当前浏览器和网站地址**下，不跨设备同步；换域名、换端口、使用隐私窗口或清除浏览器数据都会影响可用地图。请导出 JSON 保留备份。断线时已打开的工坊仍可保存、导出本地作品；房间里的地图随房间销毁或服务器重启清空。
+
+多窗口保存、删除和重置会串行执行；同一地图的旧版本保存会提示冲突，可另存为保留作品。浏览器需允许 localStorage 和 IndexedDB（用于跨窗口协调），支持 HTTP 局域网访问。
