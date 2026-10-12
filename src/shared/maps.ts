@@ -4,6 +4,7 @@ export type Platform = {
   width: number;
   height: number;
   angle: number;
+  motion?: "fixed" | "seesaw";
 };
 export type MapDefinition = {
   id: string;

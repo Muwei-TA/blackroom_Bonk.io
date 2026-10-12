@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { COLORS, MAX_PLAYERS, MAX_ROOMS } from "../shared/constants";
 import { getMap, type MapDefinition } from "../shared/maps";
+import { generateRandomMap } from "../shared/random-map";
 import { toDefinition } from "../shared/custom-map";
 import type {
   ClientMessage,
@@ -133,6 +134,17 @@ export class RoomManager {
       r.notice = "房主已加载自定义地图：" + r.map.name;
       this.broadcast(r);
       this.send(id, { type: "mapApplied" });
+      return;
+    }
+    if (m.type === "randomMap") {
+      if (phase !== "lobby") return this.error(id, "IN_PROGRESS", "比赛中不能更换地图");
+      const now = this.now();
+      if (now - (this.lastMapSubmission.get(id) ?? -Infinity) < 1000) return this.error(id, "MAP_RATE_LIMIT", "地图生成过于频繁，请稍后重试");
+      this.lastMapSubmission.set(id, now);
+      r.map = generateRandomMap(randomInt(0, 0x100000000));
+      r.map.id = "random-" + randomUUID();
+      r.notice = "已生成随机地图：固定地面与天平平台，开局后能量雨启动。";
+      this.broadcast(r);
       return;
     }
     if (m.type === "selectMap") {

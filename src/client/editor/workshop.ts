@@ -181,7 +181,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
       for (const field of container.querySelectorAll<HTMLInputElement>(
         "[data-property]",
       )) {
-        const key = field.dataset.property! as keyof Platform;
+        const key = field.dataset.property! as Exclude<keyof Platform, "motion">;
         const value = (p as Platform)[key];
         if (value !== undefined && document.activeElement !== field)
           field.value = String(
@@ -462,7 +462,7 @@ export function openWorkshop(parent: HTMLElement, options: Options) {
         refresh();
         return;
       }
-      const key = field.dataset.property! as keyof Platform;
+      const key = field.dataset.property! as Exclude<keyof Platform, "motion">;
       model.edit((d) => {
         const target =
           s.kind === "platform"

@@ -52,7 +52,7 @@ export type ClientMessage =
   | { type: "join"; nickname: string; code: string }
   | { type: "selectMap"; mapId: string }
   | { type: "applyCustomMap"; document: MapDocument }
-  | { type: "start" | "rematch" | "leave" }
+  | { type: "start" | "rematch" | "leave" | "randomMap" }
   | { type: "input"; seq: number; state: InputState };
 export type ServerMessage =
   | { type: "welcome"; playerId: string }
@@ -102,6 +102,7 @@ export function parseClientMessage(value: unknown): ClientMessage {
       exact(v, ["type", "mapId"]);
       if (typeof v.mapId !== "string" || v.mapId.length > 32) return invalid();
       return { type: "selectMap", mapId: v.mapId };
+    case "randomMap":
     case "start":
     case "rematch":
     case "leave":

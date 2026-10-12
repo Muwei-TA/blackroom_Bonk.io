@@ -69,7 +69,7 @@ it.each([
       (d.map as any).bounds = { left: -99999 };
       break;
     case "version":
-      (d as any).version = 2;
+      (d as any).version = 3;
       break;
     case "name":
       d.map.name = " ";

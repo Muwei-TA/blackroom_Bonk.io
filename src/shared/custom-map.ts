@@ -1,5 +1,5 @@
 import type { MapDefinition, Platform } from "./maps";
-import { RADIUS } from "./constants";
+import { RADIUS, SEESAW_MAX_ANGLE } from "./constants";
 import {
   circleIntersectsPlatform,
   platformCorners,
@@ -8,7 +8,7 @@ import {
 export const MAX_MAP_BYTES = 32 * 1024;
 export type MapDocument = {
   format: "blackroom-map";
-  version: 1;
+  version: 1 | 2;
   map: {
     name: string;
     subtitle: string;
@@ -50,7 +50,7 @@ function text(value: unknown, min: number, max: number, label: string): string {
 }
 export function validateDocument(value: unknown): MapDocument {
   const root = obj(value, ["format", "version", "map"], "地图文件");
-  if (root.format !== "blackroom-map" || root.version !== 1)
+  if (root.format !== "blackroom-map" || (root.version !== 1 && root.version !== 2))
     fail("不支持的地图格式或版本");
   const m = obj(root.map, ["name", "subtitle", "platforms", "spawns"], "地图");
   const name = text(m.name, 1, 40, "地图名称"),
@@ -64,15 +64,26 @@ export function validateDocument(value: unknown): MapDocument {
   if (!Array.isArray(m.spawns) || m.spawns.length !== 8)
     fail("必须设置 8 个出生点");
   const platforms = (m.platforms as unknown[]).map((value, i) => {
-    const label = `平台 ${i + 1}`,
-      p = obj(value, ["x", "y", "width", "height", "angle"], label);
-    const result = {
+    const label = `平台 ${i + 1}`;
+    const keys = ["x", "y", "width", "height", "angle"];
+    if (root.version === 2 && value && typeof value === "object" && "motion" in value) keys.push("motion");
+    const p = obj(value, keys, label);
+    if ("motion" in p && p.motion !== "fixed" && p.motion !== "seesaw") fail(label + "类型无效");
+    const result: Platform = {
       x: num(p.x, 0, 1200, label + " X"),
       y: num(p.y, 0, 800, label + " Y"),
       width: num(p.width, 20, 1200, label + "宽度"),
       height: num(p.height, 10, 400, label + "高度"),
       angle: num(p.angle, -Math.PI, Math.PI, label + "角度"),
     };
+    if ("motion" in p) result.motion = p.motion as Platform["motion"];
+    if (result.motion === "seesaw") {
+      if (Math.abs(result.angle) > SEESAW_MAX_ANGLE) fail(label + "天平初始角度须在 -45° 至 45°");
+      const w = result.width / 2, h = result.height / 2;
+      const ax = Math.min(SEESAW_MAX_ANGLE, Math.atan2(h, w)), ay = Math.min(SEESAW_MAX_ANGLE, Math.atan2(w, h));
+      const dx = w * Math.cos(ax) + h * Math.sin(ax), dy = w * Math.sin(ay) + h * Math.cos(ay);
+      if (result.x-dx < 0 || result.x+dx > 1200 || result.y-dy < 0 || result.y+dy > 800) fail(label + "天平转动范围超出编辑区域");
+    }
     if (
       platformCorners(result).some(
         (p) =>
@@ -104,7 +115,7 @@ export function validateDocument(value: unknown): MapDocument {
         fail(`出生点 ${i + 1} 与 ${j + 1} 重叠`);
   const result: MapDocument = {
     format: "blackroom-map",
-    version: 1,
+    version: root.version as 1 | 2,
     map: { name, subtitle, platforms, spawns },
   };
   if (new TextEncoder().encode(JSON.stringify(result)).length > MAX_MAP_BYTES)
@@ -125,7 +136,7 @@ export function parseMapFile(source: string): MapDocument {
 export function toDocument(m: MapDefinition): MapDocument {
   return {
     format: "blackroom-map",
-    version: 1,
+    version: 2,
     map: {
       name: m.name,
       subtitle: m.subtitle,
